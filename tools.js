@@ -17,20 +17,14 @@ const delay = (time) => {
 const addHistory = (name, data) => {
 	return new Promise(function(resolve) {
 	//	console.log('adding ', data.item);
-		resolve(message_history[name].push(data));
-	});
+	resolve(message_history[name].push(data));
+});
 }
 
 exports.getHistory = () => {
 	console.log('getting history ', message_history);
 	return message_history;
 }
-
-/*
-const myCB = () => {
-	console.log('hey Im a callback!', message_history);
-}
-*/
 
 exports.playbackStory = (config, event) => {
 	//	console.log('story is ', story);
@@ -43,75 +37,79 @@ exports.playbackStory = (config, event) => {
 		if (action.type) {
 			//Get out delay on UP FRONT, then execute the rest
 			delay(action.delay * 1000)
-				.then((res) => {
+			.then((res) => {
 
-					var apiMethod, token, as_user, thread_ts, thread_channel;
-					var params;
+				var apiMethod, token, as_user, target_ts, target_channel, params;
 
-					if (action.type === 'reply' || action.type === 'reaction') {
-						thread_ts = message_history[event.text].find(o => o.item == action.target_item).ts;
-						thread_channel = message_history[event.text].find(o => o.item == action.target_item).channel;
+				if (action.type === 'reply' || action.type === 'reaction') {
+					if (action.target_item.indexOf('trigger') >= 0) {
+						target_channel = event.channel;
+						target_ts = event.ts;
 					} else {
-						thread_ts = null;
+						target_ts = message_history[event.text].find(o => o.item == action.target_item).ts;
+						target_channel = message_history[event.text].find(o => o.item == action.target_item).channel;
 					}
+				} else {
+					target_ts = null;
+				}
 
-					switch (action.type) {
-						case 'message':
-						case 'reply':
-							{
-								apiMethod = 'chat.postMessage';
-								params = {
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									as_user: true,
-									username: action.username,
-									channel: action.channel,
-									text: action.text,
-									thread_ts: thread_ts,
-									link_names: 1,
-									unfurl_links: "true",
-									attachments: action.attachments
-								};
-								break;
-							}
-						case 'bot':
-							{
-								apiMethod = 'chat.postMessage';
-								params = {
-									token: process.env.SLACK_BOT_TOKEN,
-									as_user: false,
-									username: action.username,
-									channel: action.channel,
-									text: action.text,
-									link_names: 1,
-									unfurl_links: "true",
-									icon_emoji: action.icon_emoji,
-									icon_url: action.icon_url,
-									attachments: action.attachments
-								};
-								break;
-							}
-						case 'reaction':
-							{
-								apiMethod = 'reactions.add';
-								params = {
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									as_user: true,
-									username: action.username,
-									channel: thread_channel,
-									name: action.reaction,
-									timestamp: thread_ts
-								};
-								break;
-							}
-						default:
-							console.log('default callback');
-							callback();
-							break;
+				switch (action.type) {
+					case 'message':
+					case 'reply':
+					{
+						apiMethod = 'chat.postMessage';
+						params = {
+							token: config['Tokens'].find(o => o.name === action.username).token,
+							as_user: true,
+							username: action.username,
+							channel: action.channel,
+							text: action.text,
+							thread_ts: target_ts,
+							link_names: 1,
+							unfurl_links: "true",
+							attachments: action.attachments
+						};
+						break;
 					}
+					case 'bot':
+					{
+						apiMethod = 'chat.postMessage';
+						params = {
+							token: process.env.SLACK_BOT_TOKEN,
+							as_user: false,
+							username: action.username,
+							channel: action.channel,
+							text: action.text,
+							link_names: 1,
+							unfurl_links: "true",
+							icon_emoji: action.icon_emoji,
+							icon_url: action.icon_url,
+							attachments: action.attachments
+						};
+						break;
+					}
+					case 'reaction':
+					{
+						apiMethod = 'reactions.add';
+						params = {
+							token: config['Tokens'].find(o => o.name === action.username).token,
+							as_user: true,
+							username: action.username,
+							channel: target_channel,
+							name: action.reaction,
+							timestamp: target_ts
+						};
+						break;
+					}
+					default:
+					console.log('default callback');
+					callback();
+					break;
+				}
 
-					//console.log('method is ', apiMethod, 'params are ', params);
+				//	console.log('method is ', apiMethod, 'params are ', params);
 					axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
-						.then((result) => {
+					.then((result) => {
 							//		console.log('API call for ', apiMethod, 'resulted in: ', result.data);
 							addHistory(event.text, {
 								item: action.item,
@@ -119,14 +117,14 @@ exports.playbackStory = (config, event) => {
 								channel: result.data.channel,
 								ts: result.data.ts
 							}).then((result) => {
-						//		console.log('History currently is ', message_history);
+								console.log('History currently is ', message_history);
 								callback();
 							});
 
 						}).catch((err) => {
 							console.error('API call for ', apiMethod, 'resulted in: ', err);
 						});
-				})
+					})
 		}
 	})
 }

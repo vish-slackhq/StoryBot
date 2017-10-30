@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 const axios = require('axios');
 const bodyParser = require('body-parser');
 const express = require('express');
@@ -70,12 +69,14 @@ app.post('/slack/commands', (req, res) => {
     //do things :)
 
     var response_text = "filler material!"
-    console.log('history: ', JSON.stringify(storyTools.getHistory()));
+  //  console.log('history: ', JSON.stringify(storyTools.getHistory()));
 
     switch (text) {
 
       case 'reload':
-        response_text = "OK! I'm re-loading!";
+        response = {
+          text: "OK! I'm re-loading!"
+        };
         scriptConfig.loadConfig().then((result) => {
           triggerKeys = Object.keys(result);
           console.log('Re-loaded config for keys: ', triggerKeys);
@@ -83,18 +84,59 @@ app.post('/slack/commands', (req, res) => {
         break;
 
       case 'history':
-        response_text = text;
+        response = {
+          text: text
+        };
         break;
 
       default:
 
+        console.log('here in default');
+        const admin_menu = [{
+          fallback: 'Pre-filled because you have actions in your attachment.',
+          color: '#3f2cbc',
+          mrkdwn_in: [
+            'text',
+            'pretext',
+            'fields'
+          ],
+          pretext: 'StoryBot Admin & Config Tools',
+          callback_id: 'callback_admin_menu',
+          attachment_type: 'default',
+          actions: [{
+            name: 'Triggers',
+            text: 'Triggers',
+            type: 'button',
+            style: 'default',
+            value: 'Triggers'
+          }, {
+            name: 'History',
+            text: 'History',
+            type: 'button',
+            style: 'default',
+            value: 'History'
+          }, {
+            name: 'Cleanup',
+            text: 'Cleanup',
+            type: 'button',
+            style: 'default',
+            value: 'Cleanup'
+          }]
+        }];
+
+        response = {
+          attachments: admin_menu,
+          response_type: 'ephemeral',
+          replace_original: true
+        };
         break;
     }
 
+    console.log('about to axios.post to ', response_url, ' with the response of ',response);
     axios.post(response_url, {
-        text: response_text
+        response
       })
-      .then(function(text) {});
+      .then(function(res,err) { console.log('err? ',res, ' ',err)});
   } else {
     res.sendStatus(500);
   }
