@@ -35,15 +35,8 @@ scriptConfig.loadConfig().then((result) => {
 
 // Message Event Handler
 slackEvents.on('message', (event) => {
-
-  //console.log('config is ',scriptConfig.config);
-  //console.log('EVENT: ', event);
-
   if (event.type === 'message' && !event.bot_id) {
     if (triggerKeys.indexOf(event.text) >= 0) {
-      console.log('Match!');
-
-      //message_history[event.text.concat('-',event.ts)] = 
       storyTools.playbackStory(scriptConfig.config, event);
     }
   }
@@ -66,85 +59,184 @@ app.post('/slack/commands', (req, res) => {
   } = req.body;
 
   if (token === process.env.SLACK_VERIFICATION_TOKEN) {
-    //do things :)
-
-    var response_text = "filler material!"
-  //  console.log('history: ', JSON.stringify(storyTools.getHistory()));
+    var response_text = "filler material!";
 
     switch (text) {
+      default: const admin_menu = [{
+        fallback: 'Pre-filled because you have actions in your attachment.',
+        color: '#3f2cbc',
+        mrkdwn_in: [
+          'text',
+          'pretext',
+          'fields'
+        ],
+        pretext: 'StoryBot Admin & Config Tools',
+        callback_id: 'callback_admin_menu',
+        attachment_type: 'default',
+        actions: [{
+          name: 'Triggers',
+          text: 'Triggers',
+          type: 'button',
+          style: 'default',
+          value: 'Triggers'
+        }, {
+          name: 'History',
+          text: 'History',
+          type: 'button',
+          style: 'default',
+          value: 'History'
+        }, {
+          name: 'Cleanup All',
+          text: 'Cleanup All',
+          type: 'button',
+          style: 'default',
+          value: 'Cleanup All'
+        }, {
+          name: 'Reload Config',
+          text: 'Reload Config',
+          type: 'button',
+          style: 'default',
+          value: 'Reload Config'
+        }]
+      }];
 
-      case 'reload':
-        response = {
-          text: "OK! I'm re-loading!"
-        };
-        scriptConfig.loadConfig().then((result) => {
-          triggerKeys = Object.keys(result);
-          console.log('Re-loaded config for keys: ', triggerKeys);
-        });
-        break;
-
-      case 'history':
-        response = {
-          text: text
-        };
-        break;
-
-      default:
-
-        console.log('here in default');
-        const admin_menu = [{
-          fallback: 'Pre-filled because you have actions in your attachment.',
-          color: '#3f2cbc',
-          mrkdwn_in: [
-            'text',
-            'pretext',
-            'fields'
-          ],
-          pretext: 'StoryBot Admin & Config Tools',
-          callback_id: 'callback_admin_menu',
-          attachment_type: 'default',
-          actions: [{
-            name: 'Triggers',
-            text: 'Triggers',
-            type: 'button',
-            style: 'default',
-            value: 'Triggers'
-          }, {
-            name: 'History',
-            text: 'History',
-            type: 'button',
-            style: 'default',
-            value: 'History'
-          }, {
-            name: 'Cleanup',
-            text: 'Cleanup',
-            type: 'button',
-            style: 'default',
-            value: 'Cleanup'
-          }]
-        }];
-
-        response = {
-          attachments: admin_menu,
-          response_type: 'ephemeral',
-          replace_original: true
-        };
-        break;
+      response = {
+        attachments: admin_menu,
+        response_type: 'ephemeral',
+        replace_original: true
+      };
+      break;
     }
 
-    console.log('about to axios.post to ', response_url, ' with the response of ',response);
-    axios.post(response_url, {
-        response
-      })
-      .then(function(res,err) { console.log('err? ',res, ' ',err)});
+    axios.post(response_url, response)
+      .then(function(res, err) {});
   } else {
     res.sendStatus(500);
   }
 });
 
 // Attach action handlers
-slackMessages.action('welcome_button', (payload) => {
+slackMessages.action('callback_admin_menu', (payload) => {
   // Same as above...
+  console.log('Received action callback!', payload.actions[0].value);
+  var response = {};
+
+  switch (payload.actions[0].value) {
+    case 'History':
+      {
+        let message_history = storyTools.getHistory();
+        let message_history_keys = Object.keys(message_history);
+
+        if (message_history_keys.length > 0) {
+          let attachments = [];
+          let actions = [];
+          message_history_keys.forEach(function(key) {
+            actions.push({
+              name: key,
+              text: key,
+              value: key,
+              type: 'button'
+            });
+          });
+
+          attachments.push({
+            actions: actions,
+            title: "These are the triggers you've run. Click to cleanup:",
+            mrkdwn_in: ['text', 'fields'],
+            callback_id: 'callback_history_cleanup'
+          });
+
+          response = {
+            response_type: 'ephemeral',
+            replace_original: false,
+            attachments: attachments
+          };
+        } else {
+          response = {
+            response_type: 'ephemeral',
+            replace_original: false,
+            text: "No history right now"
+          }
+        }
+        break;
+      }
+    case 'Triggers':
+      {
+
+        if (triggerKeys.length > 0) {
+          let attachments = [];
+          let key_list = ""
+          triggerKeys.forEach(function(key) {
+            if (!(key === 'Tokens')) {
+              key_list = key_list + " \`" + key + "\`";
+            }
+          });
+
+          attachments.push({
+            fields: [{
+              value: key_list,
+              short: false
+            }],
+            title: "These are the triggers for the story:",
+            mrkdwn_in: ['text', 'fields']
+          });
+
+          response = {
+            response_type: 'ephemeral',
+            replace_original: false,
+            attachments: attachments
+          };
+        }
+        break;
+      }
+    case 'Cleanup All':
+      {
+        var msg = storyTools.deleteAllHistory();
+
+        response = {
+          text: msg,
+          replace_original: true,
+          ephemeral: true
+        };
+        break;
+      }
+    case 'Reload Config':
+      {
+        response = {
+          text: "OK! I'm re-loading!",
+          response_type: 'ephemeral',
+          replace_original: false
+        };
+
+        scriptConfig.loadConfig().then((result) => {
+          triggerKeys = Object.keys(result);
+          console.log('Re-loaded config for keys: ', triggerKeys);
+        });
+        break;
+      }
+    default:
+      break;
+  }
+
+  axios.post(payload.response_url, response)
+    .then((result) => {})
+    .catch((error) => {
+      console.log('ERROR: ', error);
+    });
+});
+
+slackMessages.action('callback_history_cleanup', (payload) => {
+  var msg = storyTools.deleteHistoryItem(payload.actions[0].value);
+
+  axios.post(payload.response_url, {
+      text: msg,
+      replace_original: true,
+      ephemeral: true
+    }).then((result) => {})
+    .catch((error) => {
+      console.log('ERROR: ', error);
+    });
+
 });
 
 // Handle errors (see `errorCodes` export)
