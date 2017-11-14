@@ -21,7 +21,6 @@ console.log('Config file is',config_file);
 // Config file
 require('dotenv').config({path: `${config_file}`}); 
 
-console.log('REQUESTED PORT IS ',process.env.PORT);
 app.set('port', process.env.PORT || 3000);
 
 /*
@@ -35,9 +34,16 @@ app.use(bodyParser.json());
 //Load the appropriate config file
 var triggerKeys = [];
 var scriptConfig = require('./load-conf-google');
+var callbackKeys = [];
 scriptConfig.loadConfig(process.env.GSHEET_ID, process.env.GOOGLE_API_CREDS).then((result) => {
   triggerKeys = Object.keys(result);
-  console.log('Loaded config for keys: ', triggerKeys);
+  //callbackKeys = Object.keys(result.Callbacks.n);
+
+  result.Callbacks.forEach(function (callback) {
+   // console.log('lets try ',callback );
+    callbackKeys.push(callback.callback_name);
+  });
+  console.log('Loaded config for keys: ', triggerKeys, 'and Callbacks are: ',callbackKeys);
 });
 
 
@@ -79,6 +85,18 @@ app.post('/slack/commands', (req, res) => {
     let response = {};
 
     switch (text) {
+      case 'chan': {
+        console.log('hey there - channels!');
+          response = {
+        text: "Creating channels now",
+        response_type: 'ephemeral',
+        replace_original: true
+      };
+        
+        storyTools.createChannels(scriptConfig.config['Channels']);
+        
+        break;
+      }
       default: const admin_menu = [{
         fallback: 'Pre-filled because you have actions in your attachment.',
         color: '#3f2cbc',
@@ -142,7 +160,7 @@ slackMessages.action('callback_admin_menu', (payload) => {
     case 'History':
       {
         let message_history = storyTools.getHistory();
-        console.log('Hsotyr is: ',message_history);
+        console.log('History is: ',message_history);
         let message_history_keys = Object.keys(message_history);
 
         if (message_history_keys.length > 0) {
@@ -185,7 +203,7 @@ slackMessages.action('callback_admin_menu', (payload) => {
           let attachments = [];
           let key_list = ""
           triggerKeys.forEach(function(key) {
-            if (!(key === 'Tokens')) {
+            if (!(key === 'Tokens' || key === 'Channels')) {
               key_list = key_list + " \`" + key + "\`";
             }
           });
@@ -257,10 +275,14 @@ slackMessages.action('callback_history_cleanup', (payload) => {
 
 });
 
+slackMessages.action('*', (payload) => {
+  console.log('hey the default got called with ',payload);
+});
+
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event) => {
   // Maybe have ad-hoc cleanup with a custom emoji? react to have it deleted?
-  console.log('reaction! ',event);
+ // console.log('reaction! ',event);
   if (event.reaction === 'skull') {
     axios.post('https://slack.com/api/chat.delete', qs.stringify({
           token: process.env.SLACK_AUTH_TOKEN,
@@ -332,7 +354,6 @@ app.get('/', (req, res) => {
   res.send('<a href="https://slack.com/oauth/authorize?&client_id=176530022562.261958402900&scope=bot,chat:write:bot,chat:write:user,reactions:write,commands"><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>');
 });
 
-
 /*
  * Start the express server
  */
@@ -342,5 +363,18 @@ app.listen(app.get('port'), () => {
   axios.post('https://slack.com/api/auth.test', qs.stringify({ token: process.env.SLACK_BOT_TOKEN}))
   .then((res) => {
           console.log("Bot connected to", res.data.team,'(',res.data.url,')');
-  }); 
+    storyTools.authBotID = res.data.user_id;
+          storyTools.getUserList();
+
+  
+    
+  })
+  
+  axios.post('https://slack.com/api/auth.test', qs.stringify({ token: process.env.SLACK_AUTH_TOKEN}))
+  .then((res) => {
+          console.log("User connected to", res.data.team,'(',res.data.url,')');
+        storyTools.authUserID = res.data.user_id;
+
+  })
+      
 });

@@ -1,6 +1,6 @@
 {
   "name": "StoryBot",
-  "version": "1.0.1",
+  "version": "2.0.1",
   "description": "StoryBot for interactive Slack demos",
   "main": "app.js",
   "scripts": {
