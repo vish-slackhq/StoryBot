@@ -59,6 +59,8 @@ app.use('/slack/events', slackEvents.expressMiddleware());
 
 // Message Event Handler
 slackEvents.on('message', (event) => {
+
+  console.log('even!', event);
   if (event.type === 'message' && !event.bot_id) {
     if (triggerKeys.indexOf(event.text) >= 0) {
       storyTools.playbackStory(scriptConfig.config, event);
@@ -265,6 +267,10 @@ app.post('/slack/actions', (req, res) => {
                 scriptConfig.loadConfig(process.env.GSHEET_ID, process.env.GOOGLE_API_CREDS).then((result) => {
                   triggerKeys = Object.keys(result);
                   console.log('Re-loaded config for keys: ', triggerKeys);
+                  result.Callbacks.forEach(function(callback) {
+                    // console.log('lets try ',callback );
+                    callbackData.push(callback.callback_name);
+                  });
                 });
                 break;
               }
@@ -279,33 +285,72 @@ app.post('/slack/actions', (req, res) => {
           });
           break;
         }
+      case 'callback_history_cleanup':
+        {
+          let msg = storyTools.deleteHistoryItem(body.actions[0].value);
 
+          response = {
+            text: msg,
+            replace_original: true,
+            ephemeral: true
+          };
+
+
+          axios.post(body.response_url, response)
+          .then((result) => {})
+          .catch((error) => {
+            console.log('ERROR: ', error);
+          });
+          break;
+        }
       default:
         {
 
           if (callbackData.indexOf(body.callback_id) >= 0) {
 
             let callbackMatch = scriptConfig.config.Callbacks.find(o => o.callback_name == body.callback_id);
-        //    console.log('Hey we matched ', body.callback_id, ' and should do ', callbackMatch.attachments);
+            //    console.log('Hey we matched ', body.callback_id, ' and should do ', callbackMatch.attachments);
 
-            response = {
-              token: process.env.SLACK_BOT_TOKEN,
-              channel: body.channel.id,
-              text: callbackMatch.text,
-              ts: body.message_ts,
-              as_user: false,
-              response_type: callbackMatch.response_type,
-              replace_original: callbackMatch.replace_original,
-              attachments: callbackMatch.attachments
-            };
+            if (callbackMatch.dialog) {
+              response = {
+                token: process.env.SLACK_BOT_TOKEN,
+                trigger_id: body.trigger_id,
+                dialog: callbackMatch.attachments
+              }
 
-            axios.post('https://slack.com/api/chat.update', qs.stringify(response))
-              .then((result) => {
-      //          console.log('API call for update resulted in: ', result.data);
+              console.log('about to call dialog.opne with ', response);
 
-              }).catch((err) => {
-                console.error('API call for  update resulted in: ', err);
-              });
+              axios.post('https://slack.com/api/dialog.open', qs.stringify(response))
+                .then((result) => {
+                  console.log('API call for dialog resulted in: ', result.data);
+
+                }).catch((err) => {
+                  console.error('API call for  dialog resulted in: ', err);
+                });
+
+
+            } else {
+
+              response = {
+                token: process.env.SLACK_BOT_TOKEN,
+                channel: body.channel.id,
+                text: callbackMatch.text,
+                ts: body.message_ts,
+                as_user: false,
+                response_type: callbackMatch.response_type,
+                replace_original: callbackMatch.replace_original,
+                attachments: callbackMatch.attachments
+              };
+
+              axios.post('https://slack.com/api/chat.update', qs.stringify(response))
+                .then((result) => {
+                  //          console.log('API call for update resulted in: ', result.data);
+
+                }).catch((err) => {
+                  console.error('API call for  update resulted in: ', err);
+                });
+
+            }
 
           } else {
             console.log('Eh, no matching action!');
