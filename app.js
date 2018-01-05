@@ -41,10 +41,12 @@ scriptConfig.loadConfig(process.env.GSHEET_ID, process.env.GOOGLE_API_CREDS).the
   triggerKeys = Object.keys(result);
   //callbackKeys = Object.keys(result.Callbacks.n);
 
-  result.Callbacks.forEach(function(callback) {
-    // console.log('lets try ',callback );
-    callbackData.push(callback.callback_name);
-  });
+  if (result.Callbacks) {
+    result.Callbacks.forEach(function(callback) {
+      // console.log('lets try ',callback );
+      callbackData.push(callback.callback_name);
+    });
+  }
   console.log('Loaded config for keys: ', triggerKeys, 'and Callbacks are: ', callbackData);
 });
 
@@ -141,6 +143,12 @@ app.post('/slack/commands', (req, res) => {
             type: 'button',
             style: 'default',
             value: 'Reload Config'
+          }, {
+            name: 'Create Channels',
+            text: 'Create Channels',
+            type: 'button',
+            style: 'default',
+            value: 'Create Channels'
           }]
         }];
 
@@ -274,6 +282,19 @@ app.post('/slack/actions', (req, res) => {
                 });
                 break;
               }
+            case 'Create Channels':
+              {
+                console.log('hey there - channels!');
+                response = {
+                  text: "Creating channels now",
+                  response_type: 'ephemeral',
+                  replace_original: true
+                };
+
+                storyTools.createChannels(scriptConfig.config['Channels']);
+
+                break;
+              }
             default:
               break;
           }
@@ -392,6 +413,24 @@ slackEvents.on('reaction_added', (event) => {
       console.error('API call resulted in: ', err);
     });
   }
+
+  if (event.reaction === 'pride') {
+
+    console.log('UPDATE ... text is ', event.item.text);
+    let strike_text = "~" + event.item.text + "~";
+
+    axios.post('https://slack.com/api/chat.update', qs.stringify({
+      token: process.env.SLACK_AUTH_TOKEN,
+      channel: event.item.channel,
+      ts: event.item.ts,
+      text: strike_text
+    })).then((result) => {
+      //        console.log('DELETE API result is ',result.data);
+    }).catch((err) => {
+      console.error('API call resulted in: ', err);
+    });
+  }
+
 });
 
 // Handle errors (see `errorCodes` export)
@@ -427,7 +466,7 @@ app.get('/install', (req, res) => {
   if (req.query.code) {
     console.log('query.code needs to be ', req);
     let redirect = res.redirect('https://wayfair-eng-demo.slack.com')
-      // console.log('ok well now the redirect is ',redirect.url)
+    // console.log('ok well now the redirect is ',redirect.url)
 
     //    let setAuth = auth => redis.set(auth.team_id, auth)
     let testAuth = auth => axios.post('https://slack.com/api/auth.test', {
