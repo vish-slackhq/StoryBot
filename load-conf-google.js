@@ -1,3 +1,9 @@
+/*
+  Code to load data from a Google Sheet
+  Parameters from the dot.env used to call StoryBot
+  Requires a valid set of Google API Creds
+*/
+
 const extractGSheet = require('spreadsheet-to-json');
 require('dotenv').config();
 

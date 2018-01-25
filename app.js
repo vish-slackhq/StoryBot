@@ -1,4 +1,3 @@
-//require('dotenv').config();
 const axios = require('axios');
 const bodyParser = require('body-parser');
 const express = require('express');
@@ -11,8 +10,10 @@ const storyTools = require('./tools.js');
 // Command line args
 var argv = require('minimist')(process.argv.slice(2));
 // variable to contain the .env file for this session
+// Defaults to .env
 var config_file = '.env';
 
+// Or can be specified with -c your_file.env
 if (argv.c) {
   config_file = argv.c;
 }
@@ -33,23 +34,22 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(bodyParser.json());
 
-//Load the appropriate config file
-var triggerKeys = [];
+//Load the appropriate config file from Google Sheets
 var scriptConfig = require('./load-conf-google');
+var triggerKeys = [];
 var callbackData = [];
-scriptConfig.loadConfig(process.env.GSHEET_ID, process.env.GOOGLE_API_CREDS).then((result) => {
-  triggerKeys = Object.keys(result);
-  //callbackKeys = Object.keys(result.Callbacks.n);
 
+scriptConfig.loadConfig().then((result) => {
+  triggerKeys = Object.keys(result);
+
+  // If we're specifying dynamic callbacks in this config
   if (result.Callbacks) {
     result.Callbacks.forEach(function(callback) {
-      // console.log('lets try ',callback );
       callbackData.push(callback.callback_name);
     });
   }
   console.log('Loaded config for keys: ', triggerKeys, 'and Callbacks are: ', callbackData);
 });
-
 
 // Events API Adapter & Endpoint
 const slackEvents = slackEventsAPI.createSlackEventAdapter(process.env.SLACK_VERIFICATION_TOKEN);
@@ -61,8 +61,7 @@ app.use('/slack/events', slackEvents.expressMiddleware());
 
 // Message Event Handler
 slackEvents.on('message', (event) => {
-
-  console.log('even!', event);
+  // Matched a trigger from a user so playback the story
   if (event.type === 'message' && !event.bot_id) {
     if (triggerKeys.indexOf(event.text) >= 0) {
       storyTools.playbackStory(scriptConfig.config, event);
@@ -75,7 +74,6 @@ slackEvents.on('message', (event) => {
  * Launches the dialog for the bug tracking ticket
  */
 app.post('/slack/commands', (req, res) => {
-
 
   const {
     token,
@@ -93,72 +91,56 @@ app.post('/slack/commands', (req, res) => {
     let response_text = "filler material!";
     let response = {};
 
-    switch (text) {
-      case 'chan':
-        {
-          console.log('hey there - channels!');
-          response = {
-            text: "Creating channels now",
-            response_type: 'ephemeral',
-            replace_original: true
-          };
+    //Build the admin menu for the bot
+    const admin_menu = [{
+      fallback: 'Pre-filled because you have actions in your attachment.',
+      color: '#3f2cbc',
+      mrkdwn_in: [
+        'text',
+        'pretext',
+        'fields'
+      ],
+      pretext: 'StoryBot Admin & Config Tools',
+      callback_id: 'callback_admin_menu',
+      attachment_type: 'default',
+      actions: [{
+        name: 'Triggers',
+        text: 'Triggers',
+        type: 'button',
+        style: 'default',
+        value: 'Triggers'
+      }, {
+        name: 'History',
+        text: 'History',
+        type: 'button',
+        style: 'default',
+        value: 'History'
+      }, {
+        name: 'Cleanup All',
+        text: 'Cleanup All',
+        type: 'button',
+        style: 'default',
+        value: 'Cleanup All'
+      }, {
+        name: 'Reload Config',
+        text: 'Reload Config',
+        type: 'button',
+        style: 'default',
+        value: 'Reload Config'
+      }, {
+        name: 'Create Channels',
+        text: 'Create Channels',
+        type: 'button',
+        style: 'default',
+        value: 'Create Channels'
+      }]
+    }];
 
-          storyTools.createChannels(scriptConfig.config['Channels']);
-
-          break;
-        }
-      default:
-        const admin_menu = [{
-          fallback: 'Pre-filled because you have actions in your attachment.',
-          color: '#3f2cbc',
-          mrkdwn_in: [
-            'text',
-            'pretext',
-            'fields'
-          ],
-          pretext: 'StoryBot Admin & Config Tools',
-          callback_id: 'callback_admin_menu',
-          attachment_type: 'default',
-          actions: [{
-            name: 'Triggers',
-            text: 'Triggers',
-            type: 'button',
-            style: 'default',
-            value: 'Triggers'
-          }, {
-            name: 'History',
-            text: 'History',
-            type: 'button',
-            style: 'default',
-            value: 'History'
-          }, {
-            name: 'Cleanup All',
-            text: 'Cleanup All',
-            type: 'button',
-            style: 'default',
-            value: 'Cleanup All'
-          }, {
-            name: 'Reload Config',
-            text: 'Reload Config',
-            type: 'button',
-            style: 'default',
-            value: 'Reload Config'
-          }, {
-            name: 'Create Channels',
-            text: 'Create Channels',
-            type: 'button',
-            style: 'default',
-            value: 'Create Channels'
-          }]
-        }];
-
-        response = {
-          attachments: admin_menu,
-          response_type: 'ephemeral',
-          replace_original: true
-        };
-        break;
-    }
+    response = {
+      attachments: admin_menu,
+      response_type: 'ephemeral',
+      replace_original: true
+    };
 
     axios.post(response_url, response)
       .then(function(res, err) {});
@@ -167,6 +149,7 @@ app.post('/slack/commands', (req, res) => {
   }
 });
 
+//Interactive messages
 app.post('/slack/actions', (req, res) => {
   const body = JSON.parse(req.body.payload);
 
@@ -178,6 +161,7 @@ app.post('/slack/actions', (req, res) => {
     // Slack know the command was received
     res.send('');
 
+    // Handle the admin menu callbacks
     switch (body.callback_id) {
 
       case 'callback_admin_menu':
@@ -272,11 +256,10 @@ app.post('/slack/actions', (req, res) => {
                   replace_original: false
                 };
 
-                scriptConfig.loadConfig(process.env.GSHEET_ID, process.env.GOOGLE_API_CREDS).then((result) => {
+                scriptConfig.loadConfig().then((result) => {
                   triggerKeys = Object.keys(result);
-                  console.log('Re-loaded config for keys: ', triggerKeys);
+                  console.log('Re-loaded config for keys: ', triggerKeys, 'and Callbacks are: ', callbackData);
                   result.Callbacks.forEach(function(callback) {
-                    // console.log('lets try ',callback );
                     callbackData.push(callback.callback_name);
                   });
                 });
@@ -284,15 +267,12 @@ app.post('/slack/actions', (req, res) => {
               }
             case 'Create Channels':
               {
-                console.log('hey there - channels!');
                 response = {
                   text: "Creating channels now",
                   response_type: 'ephemeral',
                   replace_original: true
                 };
-
                 storyTools.createChannels(scriptConfig.config['Channels']);
-
                 break;
               }
             default:
@@ -316,7 +296,6 @@ app.post('/slack/actions', (req, res) => {
             ephemeral: true
           };
 
-
           axios.post(body.response_url, response)
           .then((result) => {})
           .catch((error) => {
@@ -324,22 +303,21 @@ app.post('/slack/actions', (req, res) => {
           });
           break;
         }
+
+        //Handle what happens with dynamic callbacks defined in the script sheet
       default:
         {
-
           if (callbackData.indexOf(body.callback_id) >= 0) {
 
             let callbackMatch = scriptConfig.config.Callbacks.find(o => o.callback_name == body.callback_id);
-            //    console.log('Hey we matched ', body.callback_id, ' and should do ', callbackMatch.attachments);
 
+            // Is it a dialog?
             if (callbackMatch.dialog) {
               response = {
                 token: process.env.SLACK_BOT_TOKEN,
                 trigger_id: body.trigger_id,
                 dialog: callbackMatch.attachments
               }
-
-              console.log('about to call dialog.opne with ', response);
 
               axios.post('https://slack.com/api/dialog.open', qs.stringify(response))
                 .then((result) => {
@@ -348,10 +326,7 @@ app.post('/slack/actions', (req, res) => {
                 }).catch((err) => {
                   console.error('API call for  dialog resulted in: ', err);
                 });
-
-
             } else {
-
               response = {
                 token: process.env.SLACK_BOT_TOKEN,
                 channel: body.channel.id,
@@ -365,142 +340,43 @@ app.post('/slack/actions', (req, res) => {
 
               axios.post('https://slack.com/api/chat.update', qs.stringify(response))
                 .then((result) => {
-                  //          console.log('API call for update resulted in: ', result.data);
 
                 }).catch((err) => {
                   console.error('API call for  update resulted in: ', err);
                 });
-
             }
 
           } else {
             console.log('Eh, no matching action!');
 
           }
-
-
           break;
         }
     }
-
-
-
   } else {
     debug('Token mismatch');
     res.sendStatus(500);
   }
 });
 
-/*
-slackMessages.action('*', (payload) => {
-  console.log('hey the default got called with ',payload);
-});
-
-*/
-
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event) => {
-  // Maybe have ad-hoc cleanup with a custom emoji? react to have it deleted?
-  // console.log('reaction! ',event);
+  // Put a :skull: on an item and the bot will kill it dead
   if (event.reaction === 'skull') {
     axios.post('https://slack.com/api/chat.delete', qs.stringify({
       token: process.env.SLACK_AUTH_TOKEN,
       channel: event.item.channel,
       ts: event.item.ts
     })).then((result) => {
-      //        console.log('DELETE API result is ',result.data);
+
     }).catch((err) => {
       console.error('API call resulted in: ', err);
     });
   }
-
-  if (event.reaction === 'pride') {
-
-    console.log('UPDATE ... text is ', event.item.text);
-    let strike_text = "~" + event.item.text + "~";
-
-    axios.post('https://slack.com/api/chat.update', qs.stringify({
-      token: process.env.SLACK_AUTH_TOKEN,
-      channel: event.item.channel,
-      ts: event.item.ts,
-      text: strike_text
-    })).then((result) => {
-      //        console.log('DELETE API result is ',result.data);
-    }).catch((err) => {
-      console.error('API call resulted in: ', err);
-    });
-  }
-
 });
 
 // Handle errors (see `errorCodes` export)
 slackEvents.on('error', console.error);
-
-/*
-const slack = require('tinyspeck');
-
-// OAuth Handler
-slack.on('/install', (req, res) => {
-    console.log('Oauth handler was called: ',req.query);
-
-  if (req.query.code) {
-    let redirect = team => res.redirect(team.url)
-  //  let setAuth = auth => redis.set(auth.team_id, auth)
-    let testAuth = auth => slack.send('auth.test', { token: auth.access_token })
-        console.log('auth.access_token: ',testAuth.access_token);
-
-    let args = { client_id: process.env.CLIENT_ID, client_secret: process.env.CLIENT_SECRET, code: req.query.code }
-    slack.send('oauth.access', args).then(testAuth).then(redirect)
-  } else {
-    let url = slack.authorizeUrl({ client_id: process.env.CLIENT_ID, scope: process.env.SCOPE })
-    res.redirect(url)
-  }
-})
-
-*/
-
-
-// OAuth Handler
-app.get('/install', (req, res) => {
-  //  console.log('Oauth handler was called: ',res.redirect);
-  if (req.query.code) {
-    console.log('query.code needs to be ', req);
-    let redirect = res.redirect('https://wayfair-eng-demo.slack.com')
-    // console.log('ok well now the redirect is ',redirect.url)
-
-    //    let setAuth = auth => redis.set(auth.team_id, auth)
-    let testAuth = auth => axios.post('https://slack.com/api/auth.test', {
-      token: auth.access_token
-    })
-    testAuth;
-    console.log('auth.access_token: ', testAuth)
-
-
-    let args = {
-      client_id: process.env.CLIENT_ID,
-      client_secret: process.env.CLIENT_SECRET,
-      code: req.query.code
-    }
-    console.log('going to call with args: ', args)
-    axios.post('https://slack.com/api/oauth.access', qs.stringify(args))
-      .then((res) => {
-        console.log('this is what happened: ', res.data)
-      }).then(redirect)
-
-    //.then(testAuth). //then(redirect) //.then(setAuth).then(testAuth).then(redirect) 
-  } else {
-    let url = "https://slack.com/oauth/authorize?" + qs.stringify({
-      client_id: process.env.CLIENT_ID,
-      scope: process.env.SCOPE
-    });
-    res.redirect(url)
-  }
-});
-
-
-app.get('/', (req, res) => {
-  res.send('<a href="https://slack.com/oauth/authorize?&client_id=176530022562.261958402900&scope=bot,chat:write:bot,chat:write:user,reactions:write,commands"><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>');
-});
 
 /*
  * Start the express server
@@ -514,10 +390,9 @@ app.listen(app.get('port'), () => {
     .then((res) => {
       console.log("Bot connected to", res.data.team, '(', res.data.url, ')');
       storyTools.authBotID = res.data.user_id;
+      
+      // Cache info on the users for ID translation and inviting to channels
       storyTools.getUserList();
-
-
-
     })
 
   axios.post('https://slack.com/api/auth.test', qs.stringify({
@@ -528,5 +403,4 @@ app.listen(app.get('port'), () => {
       storyTools.authUserID = res.data.user_id;
 
     })
-
 });

@@ -13,12 +13,14 @@ var all_users = [];
 exports.authUserID;
 exports.authBotID;
 
+// Promise delay so we can make time elapse between interactions
 const delay = (time) => {
 	return new Promise(function(resolve) {
 		setTimeout(resolve, time);
 	});
 }
 
+// Add to the global history for later cleanup
 const addHistory = (name, data) => {
 	return new Promise(function(resolve) {
 		if (!message_history[name]) {
@@ -28,46 +30,45 @@ const addHistory = (name, data) => {
 	});
 }
 
+/*
 exports.getHistory = () => {
 	return message_history;
 }
+*/
 
+//Delete something from the history
 exports.deleteHistoryItem = (term) => {
 	if (!message_history[term]) {
 		return "Well this is embarassing: " + term + " doesn't exist in history";
 	} else {
-		//  console.log("Overall history is ",message_history[term]);
 		for (let i = message_history[term].length - 1; i >= 0; i--) {
-			//	 console.log("i is now ",i, " and the item is ",message_history[term][i]);
 			if (message_history[term][i].type === 'post') {
 				axios.post('https://slack.com/api/files.delete', qs.stringify({
 					token: process.env.SLACK_AUTH_TOKEN,
 					file: message_history[term][i].ts
 				})).then((result) => {
-					//			console.log('DELETE API result is ',result.data);
+
 				}).catch((err) => {
 					console.error('API call resulted in: ', err);
 				});
 			} else if (!(message_history[term][i].type === 'reaction')) {
-
 				axios.post('https://slack.com/api/chat.delete', qs.stringify({
 					token: process.env.SLACK_AUTH_TOKEN,
 					channel: message_history[term][i].channel,
 					ts: message_history[term][i].ts
 				})).then((result) => {
-					//				console.log('DELETE API result is ',result.data);
+
 				}).catch((err) => {
 					console.error('API call resulted in: ', err);
 				});
-
 			}
 		}
 		delete message_history[term];
 		return "Successfully deleted " + term + " from the history.";
-
 	}
 }
 
+//Burn it all down
 exports.deleteAllHistory = () => {
 	let historyKeys = Object.keys(message_history);
 	if (!(historyKeys.length > 0)) {
@@ -80,8 +81,11 @@ exports.deleteAllHistory = () => {
 	}
 }
 
+// The main event - once we match a trigger, play back all the items in the config sheet!
 exports.playbackStory = (config, event) => {
 	const trigger_term = event.text + "-" + event.ts;
+
+	// Make it easy to cleanup the trigger term
 	addHistory(trigger_term, {
 		item: -1,
 		type: 'trigger',
@@ -89,11 +93,12 @@ exports.playbackStory = (config, event) => {
 		ts: event.ts
 	});
 
+	// Step through the script in order
 	async.eachSeries(config[event.text], function(action, callback) {
 
+		// Ignore blank lines that may have been ingested for some reason 
 		if (action.type) {
-
-			//CLean up a fake slash command or other item that has `delete_trigger` set
+			//Clean up a fake slash command or other item that has `delete_trigger` set
 			if (action.delete_trigger) {
 				axios.post('https://slack.com/api/chat.delete', qs.stringify({
 					token: process.env.SLACK_AUTH_TOKEN,
@@ -104,13 +109,12 @@ exports.playbackStory = (config, event) => {
 				});
 			}
 
-			//Get out delay on UP FRONT, then execute the rest
+			//Delay the item if specified, then execute the rest
 			delay(action.delay * 1000)
 				.then((res) => {
 					let apiMethod, token, as_user, target_ts, target_channel, params;
 
-					console.log('ok well action is ',action);
-
+					// Set targets for the actions that need them
 					if (action.type === 'reply' || action.type === 'reaction' || action.type === 'share') {
 						if (action.target_item.indexOf('trigger') >= 0) {
 							target_ts = event.ts;
@@ -124,6 +128,7 @@ exports.playbackStory = (config, event) => {
 						}
 					}
 
+					// Pull together the paramters for the item
 					switch (action.type) {
 						case 'message':
 						case 'reply':
@@ -176,7 +181,6 @@ exports.playbackStory = (config, event) => {
 								};
 								break;
 							}
-
 						case 'ephemeral':
 							{
 								apiMethod = 'chat.postEphemeral';
@@ -224,23 +228,22 @@ exports.playbackStory = (config, event) => {
 							callback();
 							break;
 					}
-					console.log('about to call ', apiMethod, ' with params ', params)
+					//Make the call
 					axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
 						.then((result) => {
-							console.log('API call for ', apiMethod, 'resulted in: ', result.data);
-
 							let ts = result.data.ts;
 							if (action.type === 'post') {
 								ts = result.data.file.id;
 							}
 
+							//Add what just happened to the history
 							addHistory(trigger_term, {
 								item: action.item,
 								type: action.type,
 								channel: result.data.channel,
 								ts: ts
 							}).then((result) => {
-								//		console.log('History is now: ', message_history[trigger_term]);
+								//Allow the async series to go forward
 								callback();
 							});
 						}).catch((err) => {
@@ -251,44 +254,33 @@ exports.playbackStory = (config, event) => {
 	})
 }
 
+// Get the list of all users and their IDs
 exports.getUserList = () => {
 	axios.post('https://slack.com/api/users.list', qs.stringify({
 			token: process.env.SLACK_BOT_TOKEN
 		}))
 		.then((res) => {
 			user_list = res.data.members;
-			//  console.log('user_list:',user_list)
-
 			all_users = module.exports.authBotID;
-	//		console.log('ok so all_users is ', all_users)
 
 			user_list.forEach(function(user) {
 				if (!(user.id === module.exports.authUserID || user.name === 'USLACKBOT')) {
-			//		console.log('now adding ', user.id);
 					all_users = all_users + "," + user.id;
 				}
 			});
 		});
-
 }
 
+// Look up User ID from a Name
 const getUserId = (name) => {
-
-
 	let id = user_list.find(o => o.name === name).id;
-	console.log('SEARCHED: ', name, '=', id);
 	return id;
-
 }
 
+// Create channels from the CHannels tab, invite the specified users (or all) and add the bot
 exports.createChannels = (channel_info) => {
-	//  console.log('user list is ', user_list);
 	console.log('Creating channels now:', channel_info);
-
-	// let botId = user_list.find(o => o.is_bot).id;
-
 	channel_info.forEach(function(channel) {
-
 		console.log('create stuff for chan: ', channel.name);
 		axios.post('https://slack.com/api/channels.create', qs.stringify({
 				token: process.env.SLACK_AUTH_TOKEN,
@@ -310,8 +302,6 @@ exports.createChannels = (channel_info) => {
 					});
 				}
 
-				console.log('userIds are ', userIds);
-
 				axios.post('https://slack.com/api/channels.invite', qs.stringify({
 						token: process.env.SLACK_AUTH_TOKEN,
 						channel: res.data.channel.id,
@@ -322,14 +312,8 @@ exports.createChannels = (channel_info) => {
 					}).catch((err) => {
 						console.log('error inviting to channel: ', err)
 					});
-
-
-
 			}).catch((err) => {
 				console.log('error creating channel: ', err)
 			});
-
-
-
 	});
 }
