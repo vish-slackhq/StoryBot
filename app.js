@@ -54,10 +54,6 @@ scriptConfig.loadConfig().then((result) => {
 // Events API Adapter & Endpoint
 const slackEvents = slackEventsAPI.createSlackEventAdapter(process.env.SLACK_VERIFICATION_TOKEN);
 app.use('/slack/events', slackEvents.expressMiddleware());
-// Interactive Messages Adapter & endpoint
-//const slackMessages = slackInteractiveMessages.createMessageAdapter(process.env.SLACK_VERIFICATION_TOKEN);
-//app.use('/slack/actions', slackMessages.expressMiddleware());
-
 
 // Message Event Handler
 slackEvents.on('message', (event) => {
@@ -155,8 +151,6 @@ app.post('/slack/actions', (req, res) => {
 
   // check that the verification token matches expected value
   if (body.token === process.env.SLACK_VERIFICATION_TOKEN) {
-    console.log('interactive message received: ', body);
-
     // immediately respond with a empty 200 response to let
     // Slack know the command was received
     res.send('');

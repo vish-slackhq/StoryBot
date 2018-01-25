@@ -184,8 +184,6 @@ exports.playbackStory = (config, event) => {
 						case 'ephemeral':
 							{
 								apiMethod = 'chat.postEphemeral';
-
-								console.log('debug event: ', event);
 								params = {
 									token: process.env.SLACK_BOT_TOKEN,
 									user: event.user,
