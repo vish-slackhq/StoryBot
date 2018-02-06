@@ -30,11 +30,11 @@ const addHistory = (name, data) => {
 	});
 }
 
-/*
+
 exports.getHistory = () => {
 	return message_history;
 }
-*/
+
 
 //Delete something from the history
 exports.deleteHistoryItem = (term) => {
@@ -299,6 +299,7 @@ exports.createChannels = (channel_info) => {
 						userIds = userIds + "," + getUserId(user);
 					});
 				}
+				console.log('DEBUG: about to invite users to channel ',channel.name,': ',userIds);
 
 				axios.post('https://slack.com/api/channels.invite', qs.stringify({
 						token: process.env.SLACK_AUTH_TOKEN,
@@ -306,12 +307,13 @@ exports.createChannels = (channel_info) => {
 						users: userIds
 					}))
 					.then((res) => {
-						console.log('channel creaton had res: ', res.data);
+						console.log('channel invite had res: ', res.data);
 					}).catch((err) => {
 						console.log('error inviting to channel: ', err)
 					});
 			}).catch((err) => {
 				console.log('error creating channel: ', err)
+
 			});
 	});
 }

@@ -16,13 +16,13 @@
   "dependencies": {
     "@slack/events-api": "^1.0.1",
     "@slack/interactive-messages": "^0.2.0",
-    "async": "^2.5.0",
-    "axios": "^0.17.0",
+    "async": "^2.6.0",
+    "axios": "^0.17.1",
     "body-parser": "^1.18.2",
     "dotenv": "^4.0.0",
     "express": "^4.16.2",
     "google-spreadsheet-to-json": "^1.0.0",
     "minimist": "^1.2.0",
-    "spreadsheet-to-json": "^1.1.2"
+    "spreadsheet-to-json": "^1.2.0"
   }
 }
