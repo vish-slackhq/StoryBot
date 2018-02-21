@@ -154,6 +154,8 @@ exports.playbackStory = (config, event) => {
 								} else {
 									apiMethod = 'chat.postMessage';
 								}
+
+							
 								params = {
 									token: process.env.SLACK_BOT_TOKEN,
 									as_user: false,
@@ -166,6 +168,10 @@ exports.playbackStory = (config, event) => {
 									icon_url: action.icon_url,
 									attachments: action.attachments
 								};
+
+								if (action.channel === 'current') {
+									params.channel = event.channel;
+								}
 								break;
 							}
 						case 'reaction':

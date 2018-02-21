@@ -249,7 +249,7 @@ app.post('/slack/actions', (req, res) => {
                   response_type: 'ephemeral',
                   replace_original: false
                 };
-
+               // callbackData = [];
                 scriptConfig.loadConfig().then((result) => {
                   triggerKeys = Object.keys(result);
                   console.log('Re-loaded config for keys: ', triggerKeys, 'and Callbacks are: ', callbackData);
@@ -320,6 +320,24 @@ app.post('/slack/actions', (req, res) => {
                 }).catch((err) => {
                   console.error('API call for  dialog resulted in: ', err);
                 });
+            } else if (callbackMatch.reaction) {
+
+
+              console.log('DEBUG body is ',body);
+
+              response = {
+                token: process.env.SLACK_BOT_TOKEN,
+                name: callbackMatch.reaction,
+                channel: body.channel.id,
+                timestamp: body.message_ts
+              }
+
+              axios.post('https://slack.com/api/reactions.add', qs.stringify(response))
+                .then((result) => {
+                  console.log('API call for reactions.add resulted in ', result.data);
+                }).catch((err) => {
+                  console.log('API call for reactions.add had an error: ', err);
+                });
             } else {
               response = {
                 token: process.env.SLACK_BOT_TOKEN,
@@ -327,8 +345,8 @@ app.post('/slack/actions', (req, res) => {
                 text: callbackMatch.text,
                 ts: body.message_ts,
                 as_user: false,
-                response_type: callbackMatch.response_type,
-                replace_original: callbackMatch.replace_original,
+                /*     response_type: callbackMatch.response_type,
+                     replace_original: callbackMatch.replace_original,*/
                 attachments: callbackMatch.attachments
               };
 
@@ -341,7 +359,7 @@ app.post('/slack/actions', (req, res) => {
             }
 
           } else {
-            console.log('Eh, no matching action!');
+            console.log('Eh, no matching action: ',body.callback_id);
 
           }
           break;
@@ -384,7 +402,7 @@ app.listen(app.get('port'), () => {
     .then((res) => {
       console.log("Bot connected to", res.data.team, '(', res.data.url, ')');
       storyTools.authBotID = res.data.user_id;
-      
+
       // Cache info on the users for ID translation and inviting to channels
       storyTools.getUserList();
     })
