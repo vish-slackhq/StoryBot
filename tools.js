@@ -155,7 +155,7 @@ exports.playbackStory = (config, event) => {
 									apiMethod = 'chat.postMessage';
 								}
 
-							
+
 								params = {
 									token: process.env.SLACK_BOT_TOKEN,
 									as_user: false,
@@ -305,7 +305,7 @@ exports.createChannels = (channel_info) => {
 						userIds = userIds + "," + getUserId(user);
 					});
 				}
-				console.log('DEBUG: about to invite users to channel ',channel.name,': ',userIds);
+				console.log('DEBUG: about to invite users to channel ', channel.name, ': ', userIds);
 
 				axios.post('https://slack.com/api/channels.invite', qs.stringify({
 						token: process.env.SLACK_AUTH_TOKEN,
