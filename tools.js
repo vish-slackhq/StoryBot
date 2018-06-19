@@ -9,6 +9,7 @@ require('dotenv').config();
 var message_history = [];
 var user_list = [];
 var all_users = [];
+var channel_list = [];
 
 exports.authUserID;
 exports.authBotID;
@@ -111,17 +112,17 @@ exports.playbackStory = (config, event) => {
 
 			//Delay the item if specified, then execute the rest
 			delay(action.delay * 1000)
-				.then((res) => {
-					let apiMethod, token, as_user, target_ts, target_channel, params;
+			.then((res) => {
+				let apiMethod, token, as_user, target_ts, target_channel, params;
 
 					// Set targets for the actions that need them
 					if (action.type === 'reply' || action.type === 'reaction' || action.type === 'share') {
-						if (action.target_item.indexOf('trigger') >= 0) {
-							target_ts = event.ts;
-							target_channel = event.channel;
-						} else if (action.target_ts && action.target_channel) {
+						if (action.target_ts && action.target_channel) {
 							target_ts = action.target_ts;
 							target_channel = action.target_channel;
+						} else if (action.target_item.indexOf('trigger') >= 0) {
+							target_ts = event.ts;
+							target_channel = event.channel;
 						} else {
 							target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
 							target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
@@ -132,32 +133,33 @@ exports.playbackStory = (config, event) => {
 					switch (action.type) {
 						case 'message':
 						case 'reply':
-							{
-								apiMethod = 'chat.postMessage';
-								params = {
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									as_user: true,
-									username: action.username,
-									channel: action.channel,
-									text: action.text,
-									thread_ts: target_ts,
-									link_names: true,
-									unfurl_links: "true",
-									attachments: action.attachments
-								};
-								break;
-							}
+						{
+							apiMethod = 'chat.postMessage';
+							params = {
+								token: config['Tokens'].find(o => o.name === action.username).token,
+								as_user: true,
+								username: action.username,
+								channel: action.channel,
+								text: action.text,
+								thread_ts: target_ts,
+								link_names: true,
+								unfurl_links: "true",
+								attachments: action.attachments
+							};
+							break;
+						}
 						case 'bot':
-							{
-								if (action.type === 'ephemeral') {
-									apiMethod = 'chat.postEphemeral';
-								} else {
-									apiMethod = 'chat.postMessage';
-								}
+						{
+							if (action.type === 'ephemeral') {
+								apiMethod = 'chat.postEphemeral';
+							} else {
+								apiMethod = 'chat.postMessage';
+							}
 
 
-								params = {
-									token: process.env.SLACK_BOT_TOKEN,
+							params = {
+									//	token: process.env.SLACK_BOT_TOKEN,
+									token: process.env.SLACK_AUTH_TOKEN,
 									as_user: false,
 									username: action.username,
 									channel: action.channel,
@@ -174,7 +176,7 @@ exports.playbackStory = (config, event) => {
 								}
 								break;
 							}
-						case 'reaction':
+							case 'reaction':
 							{
 								apiMethod = 'reactions.add';
 								params = {
@@ -187,7 +189,7 @@ exports.playbackStory = (config, event) => {
 								};
 								break;
 							}
-						case 'ephemeral':
+							case 'ephemeral':
 							{
 								apiMethod = 'chat.postEphemeral';
 								params = {
@@ -200,7 +202,7 @@ exports.playbackStory = (config, event) => {
 								}
 								break;
 							}
-						case 'post':
+							case 'post':
 							{
 								apiMethod = 'files.upload';
 								params = {
@@ -213,7 +215,7 @@ exports.playbackStory = (config, event) => {
 								}
 								break;
 							}
-						case 'share':
+							case 'share':
 							{
 								apiMethod = 'chat.shareMessage';
 
@@ -227,18 +229,31 @@ exports.playbackStory = (config, event) => {
 								}
 								break;
 							}
-						default:
+							case 'invite':
+							{
+								apiMethod = 'channels.invite';
+
+								params = {
+									token: config['Tokens'].find(o => o.name === action.username).token,
+									channel: event.channel, //not ideal but don't feel like figuring out how to take channel name to channel ID for any channel
+									user: getUserId(action.text)
+								}
+								break;
+							}
+							default:
 							console.log('default callback');
 							callback();
 							break;
-					}
+						}
 					//Make the call
 					axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
-						.then((result) => {
-							let ts = result.data.ts;
-							if (action.type === 'post') {
-								ts = result.data.file.id;
-							}
+					.then((result) => {
+						let ts = result.data.ts;
+						if (action.type === 'post') {
+							ts = result.data.file.id;
+						}
+
+						console.error('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
 
 							//Add what just happened to the history
 							addHistory(trigger_term, {
@@ -253,26 +268,26 @@ exports.playbackStory = (config, event) => {
 						}).catch((err) => {
 							console.error('API call for ', apiMethod, 'resulted in: ', err);
 						});
-				})
-		}
-	})
+					})
+}
+})
 }
 
 // Get the list of all users and their IDs
 exports.getUserList = () => {
 	axios.post('https://slack.com/api/users.list', qs.stringify({
-			token: process.env.SLACK_BOT_TOKEN
-		}))
-		.then((res) => {
-			user_list = res.data.members;
-			all_users = module.exports.authBotID;
+		token: process.env.SLACK_BOT_TOKEN
+	}))
+	.then((res) => {
+		user_list = res.data.members;
+		all_users = module.exports.authBotID;
 
-			user_list.forEach(function(user) {
-				if (!(user.id === module.exports.authUserID || user.name === 'USLACKBOT')) {
-					all_users = all_users + "," + user.id;
-				}
-			});
+		user_list.forEach(function(user) {
+			if (!(user.id === module.exports.authUserID || user.name === 'USLACKBOT')) {
+				all_users = all_users + "," + user.id;
+			}
 		});
+	});
 }
 
 // Look up User ID from a Name
@@ -287,39 +302,58 @@ exports.createChannels = (channel_info) => {
 	channel_info.forEach(function(channel) {
 		console.log('create stuff for chan: ', channel.name);
 		axios.post('https://slack.com/api/channels.create', qs.stringify({
+			token: process.env.SLACK_AUTH_TOKEN,
+			name: channel.name,
+			purpose: channel.purpose
+		}))
+		.then((res) => {
+			console.log('res.data = ', res.data);
+			console.log('channel ID is now: ', res.data.channel.id);
+
+			let users = channel.users.split(',')
+			let userIds = module.exports.authBotID;
+
+			if (channel.users === 'all') {
+				userIds = all_users;
+			} else {
+				users.forEach(function(user) {
+					userIds = userIds + "," + getUserId(user);
+				});
+			}
+			console.log('DEBUG: about to invite users to channel ', channel.name, ': ', userIds);
+
+			axios.post('https://slack.com/api/channels.invite', qs.stringify({
 				token: process.env.SLACK_AUTH_TOKEN,
-				name: channel.name,
-				purpose: channel.purpose
+				channel: res.data.channel.id,
+				users: userIds
 			}))
 			.then((res) => {
-				console.log('res.data = ', res.data);
-				console.log('channel ID is now: ', res.data.channel.id);
-
-				let users = channel.users.split(',')
-				let userIds = module.exports.authBotID;
-
-				if (channel.users === 'all') {
-					userIds = all_users;
-				} else {
-					users.forEach(function(user) {
-						userIds = userIds + "," + getUserId(user);
-					});
-				}
-				console.log('DEBUG: about to invite users to channel ', channel.name, ': ', userIds);
-
-				axios.post('https://slack.com/api/channels.invite', qs.stringify({
-						token: process.env.SLACK_AUTH_TOKEN,
-						channel: res.data.channel.id,
-						users: userIds
-					}))
-					.then((res) => {
-						console.log('channel invite had res: ', res.data);
-					}).catch((err) => {
-						console.log('error inviting to channel: ', err)
-					});
+				console.log('channel invite had res: ', res.data);
 			}).catch((err) => {
-				console.log('error creating channel: ', err)
-
+				console.log('error inviting to channel: ', err)
 			});
+		}).catch((err) => {
+			console.log('error creating channel: ', err)
+
+		});
 	});
+}
+
+// Get the list of all channels and their IDs
+exports.getChannelList = () => {
+	axios.post('https://slack.com/api/channels.list', qs.stringify({
+		token: process.env.SLACK_BOT_TOKEN,
+		exclude_members:true,
+		exclude_archived:true,
+		get_private:true
+	}))
+	.then((res) => {
+		channel_list = res.data.channels;
+	});
+}
+
+// Look up Channel ID from a Name
+const getChannelId = (name) => {
+	let id = channel_list.find(o => o.name === name).id;
+	return id;
 }

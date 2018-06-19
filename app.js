@@ -29,10 +29,10 @@ app.set('port', process.env.PORT || 3000);
 /*
  * Parse application/x-www-form-urlencoded && application/json
  */
-app.use(bodyParser.urlencoded({
+ app.use(bodyParser.urlencoded({
   extended: true
 }));
-app.use(bodyParser.json());
+ app.use(bodyParser.json());
 
 //Load the appropriate config file from Google Sheets
 var scriptConfig = require('./load-conf-google');
@@ -69,7 +69,7 @@ slackEvents.on('message', (event) => {
  * Endpoint to receive slash commands from Slack.
  * Launches the dialog for the bug tracking ticket
  */
-app.post('/slack/commands', (req, res) => {
+ app.post('/slack/commands', (req, res) => {
 
   const {
     token,
@@ -87,59 +87,64 @@ app.post('/slack/commands', (req, res) => {
     let response_text = "filler material!";
     let response = {};
 
-    //Build the admin menu for the bot
-    const admin_menu = [{
-      fallback: 'Pre-filled because you have actions in your attachment.',
-      color: '#3f2cbc',
-      mrkdwn_in: [
+
+    console.log('command=', command);
+
+    if (command === '/storybot') {
+      //Build the admin menu for the bot
+      const admin_menu = [{
+        fallback: 'Pre-filled because you have actions in your attachment.',
+        color: '#3f2cbc',
+        mrkdwn_in: [
         'text',
         'pretext',
         'fields'
-      ],
-      pretext: 'StoryBot Admin & Config Tools',
-      callback_id: 'callback_admin_menu',
-      attachment_type: 'default',
-      actions: [{
-        name: 'Triggers',
-        text: 'Triggers',
-        type: 'button',
-        style: 'default',
-        value: 'Triggers'
-      }, {
-        name: 'History',
-        text: 'History',
-        type: 'button',
-        style: 'default',
-        value: 'History'
-      }, {
-        name: 'Cleanup All',
-        text: 'Cleanup All',
-        type: 'button',
-        style: 'default',
-        value: 'Cleanup All'
-      }, {
-        name: 'Reload Config',
-        text: 'Reload Config',
-        type: 'button',
-        style: 'default',
-        value: 'Reload Config'
-      }, {
-        name: 'Create Channels',
-        text: 'Create Channels',
-        type: 'button',
-        style: 'default',
-        value: 'Create Channels'
-      }]
-    }];
+        ],
+        pretext: 'StoryBot Admin & Config Tools',
+        callback_id: 'callback_admin_menu',
+        attachment_type: 'default',
+        actions: [{
+          name: 'Triggers',
+          text: 'Triggers',
+          type: 'button',
+          style: 'default',
+          value: 'Triggers'
+        }, {
+          name: 'History',
+          text: 'History',
+          type: 'button',
+          style: 'default',
+          value: 'History'
+        }, {
+          name: 'Cleanup All',
+          text: 'Cleanup All',
+          type: 'button',
+          style: 'default',
+          value: 'Cleanup All'
+        }, {
+          name: 'Reload Config',
+          text: 'Reload Config',
+          type: 'button',
+          style: 'default',
+          value: 'Reload Config'
+        }, {
+          name: 'Create Channels',
+          text: 'Create Channels',
+          type: 'button',
+          style: 'default',
+          value: 'Create Channels'
+        }]
+      }];
 
-    response = {
-      attachments: admin_menu,
-      response_type: 'ephemeral',
-      replace_original: true
-    };
+      response = {
+        attachments: admin_menu,
+        response_type: 'ephemeral',
+        replace_original: true
+      };
+    }
 
     axios.post(response_url, response)
-      .then(function(res, err) {});
+    .then(function(res, err) {});
   } else {
     res.sendStatus(500);
   }
@@ -148,6 +153,8 @@ app.post('/slack/commands', (req, res) => {
 //Interactive messages
 app.post('/slack/actions', (req, res) => {
   const body = JSON.parse(req.body.payload);
+  console.log('callback for ', body.callback_id);
+
 
   // check that the verification token matches expected value
   if (body.token === process.env.SLACK_VERIFICATION_TOKEN) {
@@ -155,101 +162,102 @@ app.post('/slack/actions', (req, res) => {
     // Slack know the command was received
     res.send('');
 
+
     // Handle the admin menu callbacks
     switch (body.callback_id) {
 
       case 'callback_admin_menu':
-        {
-          let response = {};
+      {
+        let response = {};
 
-          switch (body.actions[0].value) {
-            case 'History':
-              {
-                let message_history = storyTools.getHistory();
-                console.log('History is: ', message_history);
-                let message_history_keys = Object.keys(message_history);
+        switch (body.actions[0].value) {
+          case 'History':
+          {
+            let message_history = storyTools.getHistory();
+            console.log('History is: ', message_history);
+            let message_history_keys = Object.keys(message_history);
 
-                if (message_history_keys.length > 0) {
-                  let attachments = [];
-                  let actions = [];
-                  message_history_keys.forEach(function(key) {
-                    actions.push({
-                      name: key,
-                      text: key,
-                      value: key,
-                      type: 'button'
-                    });
-                  });
+            if (message_history_keys.length > 0) {
+              let attachments = [];
+              let actions = [];
+              message_history_keys.forEach(function(key) {
+                actions.push({
+                  name: key,
+                  text: key,
+                  value: key,
+                  type: 'button'
+                });
+              });
 
-                  attachments.push({
-                    actions: actions,
-                    title: "These are the triggers you've run. Click to cleanup:",
-                    mrkdwn_in: ['text', 'fields'],
-                    callback_id: 'callback_history_cleanup'
-                  });
+              attachments.push({
+                actions: actions,
+                title: "These are the triggers you've run. Click to cleanup:",
+                mrkdwn_in: ['text', 'fields'],
+                callback_id: 'callback_history_cleanup'
+              });
 
-                  response = {
-                    response_type: 'ephemeral',
-                    replace_original: false,
-                    attachments: attachments
-                  };
-                } else {
-                  response = {
-                    response_type: 'ephemeral',
-                    replace_original: false,
-                    text: "No history right now"
-                  }
+              response = {
+                response_type: 'ephemeral',
+                replace_original: false,
+                attachments: attachments
+              };
+            } else {
+              response = {
+                response_type: 'ephemeral',
+                replace_original: false,
+                text: "No history right now"
+              }
+            }
+            break;
+          }
+          case 'Triggers':
+          {
+
+            if (triggerKeys.length > 0) {
+              let attachments = [];
+              let key_list = ""
+              triggerKeys.forEach(function(key) {
+                if (!(key === 'Tokens' || key === 'Channels')) {
+                  key_list = key_list + " \`" + key + "\`";
                 }
-                break;
-              }
-            case 'Triggers':
-              {
+              });
 
-                if (triggerKeys.length > 0) {
-                  let attachments = [];
-                  let key_list = ""
-                  triggerKeys.forEach(function(key) {
-                    if (!(key === 'Tokens' || key === 'Channels')) {
-                      key_list = key_list + " \`" + key + "\`";
-                    }
-                  });
+              attachments.push({
+                fields: [{
+                  value: key_list,
+                  short: false
+                }],
+                title: "These are the triggers for the story:",
+                mrkdwn_in: ['text', 'fields']
+              });
 
-                  attachments.push({
-                    fields: [{
-                      value: key_list,
-                      short: false
-                    }],
-                    title: "These are the triggers for the story:",
-                    mrkdwn_in: ['text', 'fields']
-                  });
+              response = {
+                response_type: 'ephemeral',
+                replace_original: false,
+                attachments: attachments
+              };
+            }
+            break;
+          }
+          case 'Cleanup All':
+          {
+            let msg = storyTools.deleteAllHistory();
 
-                  response = {
-                    response_type: 'ephemeral',
-                    replace_original: false,
-                    attachments: attachments
-                  };
-                }
-                break;
-              }
-            case 'Cleanup All':
-              {
-                let msg = storyTools.deleteAllHistory();
-
-                response = {
-                  text: msg,
-                  replace_original: true,
-                  ephemeral: true
-                };
-                break;
-              }
-            case 'Reload Config':
-              {
-                response = {
-                  text: "OK! I'm re-loading!",
-                  response_type: 'ephemeral',
-                  replace_original: false
-                };
-               // callbackData = [];
+            response = {
+              text: msg,
+              replace_original: true,
+              ephemeral: true
+            };
+            break;
+          }
+          case 'Reload Config':
+          {
+            response = {
+              text: "OK! I'm re-loading!",
+              response_type: 'ephemeral',
+              replace_original: false
+            };
+                // callbackData = [];
                 scriptConfig.loadConfig().then((result) => {
                   triggerKeys = Object.keys(result);
                   console.log('Re-loaded config for keys: ', triggerKeys, 'and Callbacks are: ', callbackData);
@@ -259,7 +267,7 @@ app.post('/slack/actions', (req, res) => {
                 });
                 break;
               }
-            case 'Create Channels':
+              case 'Create Channels':
               {
                 response = {
                   text: "Creating channels now",
@@ -269,37 +277,37 @@ app.post('/slack/actions', (req, res) => {
                 storyTools.createChannels(scriptConfig.config['Channels']);
                 break;
               }
-            default:
+              default:
               break;
+            }
+
+            axios.post(body.response_url, response)
+            .then((result) => {})
+            .catch((error) => {
+              console.log('ERROR: ', error);
+            });
+            break;
+          }
+          case 'callback_history_cleanup':
+          {
+            let msg = storyTools.deleteHistoryItem(body.actions[0].value);
+
+            response = {
+              text: msg,
+              replace_original: true,
+              ephemeral: true
+            };
+
+            axios.post(body.response_url, response)
+            .then((result) => {})
+            .catch((error) => {
+              console.log('ERROR: ', error);
+            });
+            break;
           }
 
-          axios.post(body.response_url, response)
-          .then((result) => {})
-          .catch((error) => {
-            console.log('ERROR: ', error);
-          });
-          break;
-        }
-      case 'callback_history_cleanup':
-        {
-          let msg = storyTools.deleteHistoryItem(body.actions[0].value);
-
-          response = {
-            text: msg,
-            replace_original: true,
-            ephemeral: true
-          };
-
-          axios.post(body.response_url, response)
-          .then((result) => {})
-          .catch((error) => {
-            console.log('ERROR: ', error);
-          });
-          break;
-        }
-
         //Handle what happens with dynamic callbacks defined in the script sheet
-      default:
+        default:
         {
           if (callbackData.indexOf(body.callback_id) >= 0) {
 
@@ -314,16 +322,16 @@ app.post('/slack/actions', (req, res) => {
               }
 
               axios.post('https://slack.com/api/dialog.open', qs.stringify(response))
-                .then((result) => {
-                  console.log('API call for dialog resulted in: ', result.data);
+              .then((result) => {
+                console.log('API call for dialog resulted in: ', result.data);
 
-                }).catch((err) => {
-                  console.error('API call for  dialog resulted in: ', err);
-                });
+              }).catch((err) => {
+                console.error('API call for  dialog resulted in: ', err);
+              });
             } else if (callbackMatch.reaction) {
 
 
-              console.log('DEBUG body is ',body);
+              console.log('DEBUG body is ', body);
 
               response = {
                 token: process.env.SLACK_BOT_TOKEN,
@@ -333,43 +341,61 @@ app.post('/slack/actions', (req, res) => {
               }
 
               axios.post('https://slack.com/api/reactions.add', qs.stringify(response))
-                .then((result) => {
-                  console.log('API call for reactions.add resulted in ', result.data);
-                }).catch((err) => {
-                  console.log('API call for reactions.add had an error: ', err);
-                });
+              .then((result) => {
+                console.log('API call for reactions.add resulted in ', result.data);
+              }).catch((err) => {
+                console.log('API call for reactions.add had an error: ', err);
+              });
             } else {
-              response = {
+              let response = {
                 token: process.env.SLACK_BOT_TOKEN,
                 channel: body.channel.id,
                 text: callbackMatch.text,
                 ts: body.message_ts,
+                icon_url: callbackMatch.icon_url,
+                icon_emoji: callbackMatch.icon_emoji,
+                username: callbackMatch.username,
+                link_names: true,
                 as_user: false,
                 /*     response_type: callbackMatch.response_type,
-                     replace_original: callbackMatch.replace_original,*/
+                replace_original: callbackMatch.replace_original,*/
                 attachments: callbackMatch.attachments
               };
 
-              axios.post('https://slack.com/api/chat.update', qs.stringify(response))
+              if (callbackMatch.channel != 'current') {
+                response.channel = callbackMatch.channel
+              }
+
+              if (callbackMatch.update) {
+
+                axios.post('https://slack.com/api/chat.update', qs.stringify(response))
                 .then((result) => {
 
                 }).catch((err) => {
                   console.error('API call for  update resulted in: ', err);
                 });
+              } else {
+                axios.post('https://slack.com/api/chat.postMessage', qs.stringify(response))
+                .then((result) => {
+                  console.log('DEBUG callback: ', response);
+                }).catch((err) => {
+                  console.error('API call for  update resulted in: ', err);
+                });
+              }
             }
 
           } else {
-            console.log('Eh, no matching action: ',body.callback_id);
+            console.log('Eh, no matching action: ', body.callback_id);
 
           }
           break;
         }
+      }
+    } else {
+      debug('Token mismatch');
+      res.sendStatus(500);
     }
-  } else {
-    debug('Token mismatch');
-    res.sendStatus(500);
-  }
-});
+  });
 
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event) => {
@@ -393,26 +419,26 @@ slackEvents.on('error', console.error);
 /*
  * Start the express server
  */
-app.listen(app.get('port'), () => {
+ app.listen(app.get('port'), () => {
   console.log(`App listening on port ${app.get('port')}!`);
 
   axios.post('https://slack.com/api/auth.test', qs.stringify({
-      token: process.env.SLACK_BOT_TOKEN
-    }))
-    .then((res) => {
-      console.log("Bot connected to", res.data.team, '(', res.data.url, ')');
-      storyTools.authBotID = res.data.user_id;
+    token: process.env.SLACK_BOT_TOKEN
+  }))
+  .then((res) => {
+    console.log("Bot connected to", res.data.team, '(', res.data.url, ')');
+    storyTools.authBotID = res.data.user_id;
 
       // Cache info on the users for ID translation and inviting to channels
       storyTools.getUserList();
     })
 
   axios.post('https://slack.com/api/auth.test', qs.stringify({
-      token: process.env.SLACK_AUTH_TOKEN
-    }))
-    .then((res) => {
-      console.log("User connected to", res.data.team, '(', res.data.url, ')');
-      storyTools.authUserID = res.data.user_id;
+    token: process.env.SLACK_AUTH_TOKEN
+  }))
+  .then((res) => {
+    console.log("User connected to", res.data.team, '(', res.data.url, ')');
+    storyTools.authUserID = res.data.user_id;
 
-    })
+  })
 });

@@ -2,3 +2,4 @@ node_modules/
 *.env
 google_sheets_creds.json
 package-lock.json
+glitch-dot-env-smock-test
