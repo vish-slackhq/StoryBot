@@ -331,7 +331,7 @@ app.post('/slack/actions', (req, res) => {
             } else if (callbackMatch.reaction) {
 
 
-              console.log('DEBUG body is ', body);
+         //     console.log('DEBUG body is ', body);
 
               response = {
                 token: process.env.SLACK_BOT_TOKEN,
@@ -377,7 +377,7 @@ app.post('/slack/actions', (req, res) => {
               } else {
                 axios.post('https://slack.com/api/chat.postMessage', qs.stringify(response))
                 .then((result) => {
-                  console.log('DEBUG callback: ', response);
+         //         console.log('DEBUG callback: ', response);
                 }).catch((err) => {
                   console.error('API call for  update resulted in: ', err);
                 });
