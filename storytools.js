@@ -345,6 +345,7 @@ const getHistory = () => {
 const deleteHistoryItem = (term) => {
 	if (!message_history[term]) {
 		console.log('<History> Well this is embarassing:' + term + "doesn't exist in history");
+		return 'Well this is embarassing: ' + term + " doesn't exist in history";
 	} else {
 		for (let i = message_history[term].length - 1; i >= 0; i--) {
 			if (message_history[term][i].type === 'post') {
@@ -379,6 +380,7 @@ const deleteHistoryItem = (term) => {
 		}
 		delete message_history[term];
 		console.log('<History> Successfully deleted', term, 'from the history.');
+		return 'Successfully deleted ' + term + ' from the history.';
 	}
 }
 
