@@ -117,7 +117,7 @@ slackEvents.on('error', console.error);
 
 //slackInteractions.action('callback_admin_menu', storyBotTools.adminCallback);
 slackInteractions.action('callback_admin_menu', (payload, respond) => {
-//	console.log('OK heres what we have', payload);
+	//	console.log('OK heres what we have', payload);
 
 	switch (payload.actions[0].value) {
 		case 'Triggers':
@@ -141,7 +141,7 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 						mrkdwn_in: ['text', 'fields']
 					});
 
-			//		console.log('<DEBUG><Admin Menu> Triggers response is', attachments);
+					//		console.log('<DEBUG><Admin Menu> Triggers response is', attachments);
 					respond({
 						response_type: 'ephemeral',
 						replace_original: true,
@@ -172,6 +172,18 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 				}).catch(console.error);
 				break;
 			}
+		case 'Create Channels':
+			{
+				console.log('<Debug><Creating Channels>');
+				storyBotTools.createChannels(scriptConfig.config.Channels);
+				
+				respond({
+					text: "Creating channels now",
+					response_type: 'ephemeral',
+					replace_original: true
+				}).catch(console.error);
+				break;
+			}
 		default:
 			{
 				storyBotTools.adminCallback(payload, respond);
@@ -184,7 +196,7 @@ slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanu
 slackInteractions.action(/callback_/, (payload, respond) => {
 
 	if (callbackData.indexOf(payload.callback_id) >= 0) {
-//		console.log('<Callback> DEBUG: matched callback with ', payload);
+		//		console.log('<Callback> DEBUG: matched callback with ', payload);
 		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
 	} else {
 		console.log('<Callback> No match in the config for', payload.callback_id);

@@ -21,10 +21,10 @@ const webClientBot = new WebClient(process.env.SLACK_AUTH_TOKEN);
 // Global variables - way to not need these?
 var message_history = [];
 var user_list = [];
-var all_users = [];
+var allUserIds = [];
 var channel_list = [];
 //exports.authUserID;
-//var authBotID = null;
+var botID;
 
 
 exports.playbackScript = (config, event) => {
@@ -47,7 +47,7 @@ exports.playbackScript = (config, event) => {
 			//Clean up a fake slash command or other item that has `delete_trigger` set
 			if (action.delete_trigger) {
 
-			//	console.log('<DEBUG> Need to delete the trigger message');
+				//	console.log('<DEBUG> Need to delete the trigger message');
 				webClientBot.chat.delete({
 					channel: event.channel,
 					ts: event.ts
@@ -387,7 +387,7 @@ const deleteHistoryItem = (term) => {
 // Burn it all down
 const deleteAllHistory = () => {
 	let historyKeys = Object.keys(message_history);
-//	console.log('<DEBUG> Time to delete all history with keys', historyKeys);
+	//	console.log('<DEBUG> Time to delete all history with keys', historyKeys);
 	if (!(historyKeys.length > 0)) {
 		console.log('<History> No history to delete!');
 		return "No history to delete!";
@@ -408,15 +408,15 @@ exports.deleteItem = (channel, ts) => {
 
 // Get the list of all users and their IDs
 const buildUserList = (authBotId) => {
-
+	botId = authBotId;
 	webClientBot.users.list()
 		.then((res) => {
 			//	console.log('<DEBUG> getUserList users.list resulted in',res);
 			user_list = res.members;
-			all_users = authBotId;
+			allUserIds = [];
 			user_list.forEach(function(user) {
-				if (!(user.id === module.exports.authUserID || user.name === 'USLACKBOT')) {
-					all_users = all_users + "," + user.id;
+				if (!(user.id === authBotId || user.id === 'USLACKBOT')) {
+					allUserIds = allUserIds + "," + user.id;
 				}
 			});
 			//		console.log('<DEBUG> buildUserList final list is',user_list);
@@ -450,9 +450,58 @@ const getChannelId = (name) => {
 	return id;
 }
 
+const inviteUsersToChannel = (channelId, userIdList) => {
+	console.log('<Debug><Create Channels> Inviting users to channel ID', channelId, 'now for userIds', userIdList);
+	webClientBot.channels.invite({
+		channel: channelId,
+		users: userIdList
+	}).catch((err) => {
+		console.log('<Error><InviteUsers>', err.data);
+	});
+}
+
+exports.createChannels = (channelInfo) => {
+	console.log('<Debug><Create Channels> Creating channels now for', channelInfo);
+
+	channelInfo.forEach(function(channel) {
+		console.log('<Debug><Create Channels> Creating for', channel);
+
+
+		let id = getChannelId(channel.name);
+		let userIdsToInvite = [];
+
+		if (channel.users === 'all') {
+			userIdsToInvite = allUserIds;
+		} else {
+			channel.users.split(',').forEach(function(user) {
+				userIdsToInvite = userIdsToInvite + "," + getUserId(user);
+			});
+		}
+
+		if (id) {
+			inviteUsersToChannel(id, userIdsToInvite);
+		} else {
+
+			webClientBot.channels.create({
+				name: channel.name,
+				purpose: channel.purpose
+			}).then((res) => {
+				//need to inviter users to channel now
+
+				inviteUsersToChannel(res.data.channel.id, userIdsToInvite);
+
+			}).catch((err) => {
+				console.log('<Error><ChannelCreate>', err.data);
+			});
+		}
+	});
+}
+
 exports.validateBotConnection = () => {
 	webClientBot.auth.test()
 		.then((res) => {
+
+		//	console.log('<DEBUG>auth result is',res);
 			const {
 				team,
 				user_id
@@ -531,14 +580,14 @@ exports.adminMenu = (body) => {
 		response_type: 'ephemeral',
 		replace_original: true
 	}).then((res) => {
-	//	console.log('<Slash Command> Called webhook');
+		//	console.log('<Slash Command> Called webhook');
 	}).catch(console.error);
 }
 
 // Handle the admin menu callbacks
 exports.adminCallback = (payload, respond) => {
 
-//	console.log('<Admin Menu> Payload is', payload);
+	//	console.log('<Admin Menu> Payload is', payload);
 
 	switch (payload.actions[0].value) {
 		case 'History':
@@ -616,7 +665,7 @@ exports.historyCleanup = (payload, respond) => {
 }
 
 exports.callbackMatch = (payload, respond, callback) => {
-//	console.log('<Callbacks> DEBUG - this is the matching callback', callback);
+	//	console.log('<Callbacks> DEBUG - this is the matching callback', callback);
 
 	let response = {
 		text: "default response"
@@ -646,12 +695,12 @@ exports.callbackMatch = (payload, respond, callback) => {
 		}
 
 		if (callback.update) {
-		//	console.log('<Callbacks> DEBUG - this is an update, using', response);
+			//	console.log('<Callbacks> DEBUG - this is an update, using', response);
 			webClientBot.chat.update(response).catch(console.error);
 
 
 		} else {
-		//	console.log('<Callbacks> DEBUG - this is a new message, using', response);
+			//	console.log('<Callbacks> DEBUG - this is a new message, using', response);
 			webClientBot.chat.postMessage(response).catch(console.error);
 			/*
 						webClientBot.chat.postMessage(response)
