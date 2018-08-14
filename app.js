@@ -35,31 +35,32 @@ scriptConfig.loadConfig().then((result) => {
 // Express app server
 const http = require('http');
 const express = require('express');
-const bodyParser = require('body-parser');
+//const bodyParser = require('body-parser');
 
 // Require Slack Node SDK web client
 const {
 	createMessageAdapter
 } = require('@slack/interactive-messages');
 const {
-	createSlackEventAdapter
+	createEventAdapter
 } = require('@slack/events-api');
 
 // An access token (from your Slack app or custom integration - xoxp, xoxb, or xoxa)
 const token = process.env.SLACK_BOT_TOKEN;
 
 // Create the adapter using the app's verification token, read from environment variable
-const slackInteractions = createMessageAdapter(process.env.SLACK_VERIFICATION_TOKEN);
-const slackEvents = createSlackEventAdapter(process.env.SLACK_VERIFICATION_TOKEN);
+const slackInteractions = createMessageAdapter(process.env.SLACK_SIGNING_SECRET);
+const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET);
 
 // Initialize an Express application
 // NOTE: You must use a body parser for the urlencoded format before attaching the adapter
 const app = express();
+/*
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
 	extended: false
 }));
-
+*/
 app.post('/slack/commands', function(req, res) {
 
 	const {
@@ -176,7 +177,7 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 			{
 				console.log('<Debug><Creating Channels>');
 				storyBotTools.createChannels(scriptConfig.config.Channels);
-				
+
 				respond({
 					text: "Creating channels now",
 					response_type: 'ephemeral',
