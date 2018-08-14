@@ -60,255 +60,310 @@ exports.playbackScript = (config, event) => {
 					let apiMethod, token, as_user, target_ts, target_channel, params;
 
 					// Set targets for the actions that need them
-					if (action.type === 'reply' || action.type === 'reaction' || action.type === 'share') {
-						if (action.target_ts && action.target_channel) {
-							target_ts = action.target_ts;
-							target_channel = action.target_channel;
-						} else if (action.target_item.indexOf('trigger') >= 0) {
-							target_ts = event.ts;
-							target_channel = event.channel;
-						} else {
+
+					if (action.type === 'botuser') {
+						if (action.target_item) {
 							target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
 							target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
 						}
-					}
 
-					//	console.log('DEBUG: received event with type ',action.type);
-
-					// Pull together the paramters for the item
-					switch (action.type) {
-						case 'message':
-						case 'reply':
-							{
-								webClientBot.chat.postMessage({
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									as_user: true,
-									username: action.username,
-									channel: action.channel,
-									text: action.text,
-									thread_ts: target_ts,
-									link_names: true,
-									unfurl_links: true,
-									attachments: action.attachments
-								})
-								.then((res) => {
-									//			console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res.ok);
-									//Add what just happened to the history
-									addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										})
-										.catch(console.error);
-								})
-								.catch(console.error);
-								break;
-							}
-						case 'bot':
-						case 'botdm':
-							{
-								params = {
+						if (action.reaction) {
+							webClientBot.reactions.add({
 									as_user: false,
-									username: action.username,
-									channel: action.channel,
-									text: action.text,
-									link_names: true,
-									unfurl_links: "true",
-									icon_emoji: action.icon_emoji,
-									icon_url: action.icon_url,
-									attachments: action.attachments
-								};
-
-								if (action.channel === 'current') {
-									params.channel = event.channel;
-								}
-
-								webClientBot.chat.postMessage(params)
-								.then((res) => {
-									//			console.log('<DEBUG> API call for Bot postMessage with params', params, 'had response', res.ok);
-									//Add what just happened to the history
-									addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										})
-										.catch(console.error);
-								})
-								.catch(console.error);
-								break;
-							}
-						case 'reaction':
-							{
-								webClientBot.reactions.add({
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									as_user: true,
 									username: action.username,
 									channel: target_channel,
 									name: action.reaction,
 									timestamp: target_ts
 								})
 								.then((res) => {
-									//		console.log('<DEBUG> API call for reactions.add with params', params, 'had response', res.ok);
-									//Add what just happened to the history
-									addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										})
-										.catch(console.error);
-								})
-								.catch(console.error);
-								break;
-
-							}
-						case 'ephemeral':
-							{
-								webClientBot.chat.postEphemeral({
-									user: event.user,
-									channel: event.channel,
-									as_user: false,
-									link_names: true,
-									attachments: action.attachments
-								})
-								.then((res) => {
-									//			console.log('<DEBUG> API call for postEphemeral with params', params, 'had response', res);
-									//Add what just happened to the history
-									addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.message_ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										})
-										.catch(console.error);
-								})
-								.catch(console.error);
-								break;
-							}
-						case 'post':
-							{
-								webClientBot.files.upload({
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									channels: action.channel,
-									filetype: 'post',
-									title: action.title,
-									initial_comment: action.text,
-									content: action.content
-								})
-								.then((res) => {
-									//			console.log('<DEBUG> API call for files.upload with params', params, 'had response', res);
-									//Add what just happened to the history
-									addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.file.id
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										})
-										.catch(console.error);
-								})
-								.catch(console.error);
-								break;
-							}
-						case 'status':
-							{
-
-								webClientBot.users.profile.set({
-									//user: getUserId(action.username),
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									profile: {
-										"status_text": action.text,
-										"status_emoji": action.reaction
-									}
-								})
-								.then((res) => {
-									//console.log('<DEBUG> API call for users.profile.set had response', res);
-									//Add what just happened to the history
-									addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											username: res.username,
-											ts: res.message_ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										})
-										.catch(console.error);
-								})
-								.catch(console.error);
-
-								break;
-							}
-						case 'share':
-							{
-								apiMethod = 'chat.shareMessage';
-
-								params = {
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									text: action.text,
-									share_channel: action.channel,
-									channel: target_channel,
-									timestamp: target_ts,
-									link_names: true
-								}
-
-								//Make the call
-								axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
-								.then((result) => {
-									let ts = result.data.ts;
-									if (action.type === 'post') {
-										ts = result.data.file.id;
-									}
-
-									console.error('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
-
 									//Add what just happened to the history
 									addHistory(trigger_term, {
 										item: action.item,
 										type: action.type,
-										channel: result.data.channel,
-										ts: ts
-									}).then((result) => {
+										channel: res.channel,
+										ts: res.ts
+									}).then((res) => {
 										//Allow the async series to go forward
 										callback();
-									});
-								}).catch((err) => {
-									console.error('API call for ', apiMethod, 'resulted in: ', err);
-								});
+									}).catch(console.error);
+								}).catch(console.error);
+						} else {
+							webClientBot.chat.postMessage({
+								as_user: false,
+								username: action.username,
+								channel: action.channel,
+								text: action.text,
+								thread_ts: target_ts,
+								link_names: true,
+								unfurl_links: true,
+								attachments: action.attachments
+							}).then((res) => {
+								//Add what just happened to the history
+								addHistory(trigger_term, {
+										item: action.item,
+										type: action.type,
+										channel: res.channel,
+										ts: res.ts
+									}).then((res) => {
+										//Allow the async series to go forward
+										callback();
+									})
+									.catch(console.error);
+							}).catch(console.error);
+						}
+					} else {
 
-								break;
+						if (action.type === 'reply' || action.type === 'reaction' || action.type === 'share') {
+							if (action.target_ts && action.target_channel) {
+								target_ts = action.target_ts;
+								target_channel = action.target_channel;
+							} else if (action.target_item.indexOf('trigger') >= 0) {
+								target_ts = event.ts;
+								target_channel = event.channel;
+							} else {
+								target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
+								target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
 							}
-						case 'invite':
-							{
-								apiMethod = 'channels.invite';
+						}
 
-								params = {
-									token: config['Tokens'].find(o => o.name === action.username).token,
-									channel: event.channel, //not ideal but don't feel like figuring out how to take channel name to channel ID for any channel
-									user: getUserId(action.text)
+						//	console.log('DEBUG: received event with type ',action.type);
+
+
+						// Pull together the paramters for the item
+						switch (action.type) {
+							case 'message':
+							case 'reply':
+								{
+									webClientBot.chat.postMessage({
+										token: config['Tokens'].find(o => o.name === action.username).token,
+										as_user: true,
+										username: action.username,
+										channel: action.channel,
+										text: action.text,
+										thread_ts: target_ts,
+										link_names: true,
+										unfurl_links: true,
+										attachments: action.attachments
+									})
+									.then((res) => {
+										//			console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res.ok);
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+												item: action.item,
+												type: action.type,
+												channel: res.channel,
+												ts: res.ts
+											}).then((res) => {
+												//Allow the async series to go forward
+												callback();
+											})
+											.catch(console.error);
+									})
+									.catch(console.error);
+									break;
 								}
+							case 'bot':
+							case 'botdm':
+								{
+									params = {
+										as_user: false,
+										username: action.username,
+										channel: action.channel,
+										text: action.text,
+										link_names: true,
+										unfurl_links: true,
+										icon_emoji: action.icon_emoji,
+										icon_url: action.icon_url,
+										attachments: action.attachments
+									};
+
+									if (action.channel === 'current') {
+										params.channel = event.channel;
+									}
+
+									webClientBot.chat.postMessage(params)
+									.then((res) => {
+										console.log('<DEBUG> API call for Bot postMessage with params', params, 'had response', res.ok);
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+												item: action.item,
+												type: action.type,
+												channel: res.channel,
+												ts: res.ts
+											}).then((res) => {
+												//Allow the async series to go forward
+												callback();
+											})
+											.catch(console.error);
+									})
+									.catch(console.error);
+									break;
+								}
+							case 'reaction':
+								{
+									webClientBot.reactions.add({
+										token: config['Tokens'].find(o => o.name === action.username).token,
+										as_user: true,
+										username: action.username,
+										channel: target_channel,
+										name: action.reaction,
+										timestamp: target_ts
+									})
+									.then((res) => {
+										//		console.log('<DEBUG> API call for reactions.add with params', params, 'had response', res.ok);
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+												item: action.item,
+												type: action.type,
+												channel: res.channel,
+												ts: res.ts
+											}).then((res) => {
+												//Allow the async series to go forward
+												callback();
+											})
+											.catch(console.error);
+									})
+									.catch(console.error);
+									break;
+
+								}
+							case 'ephemeral':
+								{
+									webClientBot.chat.postEphemeral({
+										user: event.user,
+										channel: event.channel,
+										as_user: false,
+										link_names: true,
+										attachments: action.attachments
+									})
+									.then((res) => {
+										//			console.log('<DEBUG> API call for postEphemeral with params', params, 'had response', res);
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+												item: action.item,
+												type: action.type,
+												channel: res.channel,
+												ts: res.message_ts
+											}).then((res) => {
+												//Allow the async series to go forward
+												callback();
+											})
+											.catch(console.error);
+									})
+									.catch(console.error);
+									break;
+								}
+							case 'post':
+								{
+									webClientBot.files.upload({
+										token: config['Tokens'].find(o => o.name === action.username).token,
+										channels: action.channel,
+										filetype: 'post',
+										title: action.title,
+										initial_comment: action.text,
+										content: action.content
+									})
+									.then((res) => {
+										//			console.log('<DEBUG> API call for files.upload with params', params, 'had response', res);
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+												item: action.item,
+												type: action.type,
+												channel: res.channel,
+												ts: res.file.id
+											}).then((res) => {
+												//Allow the async series to go forward
+												callback();
+											})
+											.catch(console.error);
+									})
+									.catch(console.error);
+									break;
+								}
+							case 'status':
+								{
+
+									webClientBot.users.profile.set({
+										//user: getUserId(action.username),
+										token: config['Tokens'].find(o => o.name === action.username).token,
+										profile: {
+											"status_text": action.text,
+											"status_emoji": action.reaction
+										}
+									})
+									.then((res) => {
+										//console.log('<DEBUG> API call for users.profile.set had response', res);
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+												item: action.item,
+												type: action.type,
+												username: res.username,
+												ts: res.message_ts
+											}).then((res) => {
+												//Allow the async series to go forward
+												callback();
+											})
+											.catch(console.error);
+									})
+									.catch(console.error);
+
+									break;
+								}
+							case 'share':
+								{
+									apiMethod = 'chat.shareMessage';
+
+									params = {
+										token: config['Tokens'].find(o => o.name === action.username).token,
+										text: action.text,
+										share_channel: action.channel,
+										channel: target_channel,
+										timestamp: target_ts,
+										link_names: true
+									}
+
+									//Make the call
+									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
+									.then((result) => {
+										let ts = result.data.ts;
+										if (action.type === 'post') {
+											ts = result.data.file.id;
+										}
+
+										console.error('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
+
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: result.data.channel,
+											ts: ts
+										}).then((result) => {
+											//Allow the async series to go forward
+											callback();
+										});
+									}).catch((err) => {
+										console.error('API call for ', apiMethod, 'resulted in: ', err);
+									});
+
+									break;
+								}
+							case 'invite':
+								{
+									apiMethod = 'channels.invite';
+
+									params = {
+										token: config['Tokens'].find(o => o.name === action.username).token,
+										channel: event.channel, //not ideal but don't feel like figuring out how to take channel name to channel ID for any channel
+										user: getUserId(action.text)
+									}
+									break;
+								}
+							default:
+								console.log('default callback');
+								callback();
 								break;
-							}
-						default:
-							console.log('default callback');
-							callback();
-							break;
+						}
 					}
 				})
 				.catch(console.error);
@@ -446,8 +501,16 @@ const getChannelList = () => {
 
 // Look up Channel ID from a Name
 const getChannelId = (name) => {
-	let id = channel_list.find(o => o.name === name).id;
-	return id;
+	console.log('<DEBUG><getChannelId> Called for name', name);
+
+	let result = null;
+
+	if (channel_list.find(channel => channel.name === name)) {
+		result = channel_list.find(channel => channel.name === name).id;
+	}
+
+	console.log('<DEBUG><getChannelId> Called for name', name, 'with result id', result);
+	return result;
 }
 
 const inviteUsersToChannel = (channelId, userIdList) => {
@@ -466,28 +529,43 @@ exports.createChannels = (channelInfo) => {
 	channelInfo.forEach(function(channel) {
 		console.log('<Debug><Create Channels> Creating for', channel);
 
-
 		let id = getChannelId(channel.name);
 		let userIdsToInvite = [];
 
+		console.log('<MEGA DEBUG> Get ready about to do it but the id is', id);
+
 		if (channel.users === 'all') {
 			userIdsToInvite = allUserIds;
-		} else {
+		} else if (channel.users) {
 			channel.users.split(',').forEach(function(user) {
 				userIdsToInvite = userIdsToInvite + "," + getUserId(user);
 			});
 		}
 
+		console.log('<MEGA DEBUG> We made it here so id is', id, 'and userIdsToInvite is', userIdsToInvite);
+
 		if (id) {
+			console.log('<DEBUG><Invite Users> Found an existing channel', channel.name, 'matched with', id);
 			inviteUsersToChannel(id, userIdsToInvite);
 		} else {
+			console.log('<DEBUG><Create Channels> Creating the new channel', channel.name);
 
 			webClientBot.channels.create({
 				name: channel.name,
-				purpose: channel.purpose
 			}).then((res) => {
-				//need to inviter users to channel now
+				//need to invite users to channel now
 
+				/*	console.log('MEGA DEBUG trying to setPurpose for ',res.data.channel.id,' do we havea purpose?',channel.purpose);
+
+					if (channel.purpose) {
+						webClientBot.channels.setPurpose({
+							channel: res.data.channel.id,
+							purpose: channel.purpose
+						}).then((res) => {
+							console.log('<DEBUG><Channel Purpose>', res.data);
+						}).catch(console.error);
+					}*/
+				console.log('<DEBUG><Invite Users> About to invite users to new channel ID', res.data.channel.id);
 				inviteUsersToChannel(res.data.channel.id, userIdsToInvite);
 
 			}).catch((err) => {
@@ -501,7 +579,7 @@ exports.validateBotConnection = () => {
 	webClientBot.auth.test()
 		.then((res) => {
 
-		//	console.log('<DEBUG>auth result is',res);
+			//	console.log('<DEBUG>auth result is',res);
 			const {
 				team,
 				user_id
@@ -665,7 +743,7 @@ exports.historyCleanup = (payload, respond) => {
 }
 
 exports.callbackMatch = (payload, respond, callback) => {
-	//	console.log('<Callbacks> DEBUG - this is the matching callback', callback);
+	console.log('<Callbacks> DEBUG - this is the payload', payload);
 
 	let response = {
 		text: "default response"
@@ -676,7 +754,19 @@ exports.callbackMatch = (payload, respond, callback) => {
 			trigger_id: payload.trigger_id,
 			dialog: callback.attachments
 		}
-		webClientBot.dialog.open(response).catch(console.error);
+		webClientBot.dialog.open(response).catch((err) => {
+			//	console.error('DIalog Open errored out with',err, 'and response_metadata',err.data.response_metadata);
+			console.error(err);
+		});
+
+	} else if (callback.ephemeral) {
+		webClientBot.chat.postEphemeral({
+			user: payload.user.id,
+			channel: payload.channel.id,
+			as_user: false,
+			link_names: true,
+			attachments: callback.attachments
+		}).catch(console.error);
 	} else {
 		response = {
 			channel: payload.channel.id,
@@ -685,10 +775,17 @@ exports.callbackMatch = (payload, respond, callback) => {
 			icon_url: callback.icon_url,
 			icon_emoji: callback.icon_emoji,
 			username: callback.username,
+			thread_ts: null,
 			link_names: true,
 			as_user: false,
 			attachments: callback.attachments
 		};
+
+		/*
+				if (callback.thread) {
+					console.log('<DEBUG><Callback Thread>');
+					response.thread_ts = payload.action_ts;
+				}*/
 
 		if (callback.channel != 'current') {
 			response.channel = getChannelId(callback.channel);
@@ -698,9 +795,8 @@ exports.callbackMatch = (payload, respond, callback) => {
 			//	console.log('<Callbacks> DEBUG - this is an update, using', response);
 			webClientBot.chat.update(response).catch(console.error);
 
-
 		} else {
-			//	console.log('<Callbacks> DEBUG - this is a new message, using', response);
+			console.log('<Callbacks> DEBUG - this is a new message, using', response);
 			webClientBot.chat.postMessage(response).catch(console.error);
 			/*
 						webClientBot.chat.postMessage(response)
