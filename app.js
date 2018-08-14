@@ -35,7 +35,6 @@ scriptConfig.loadConfig().then((result) => {
 // Express app server
 const http = require('http');
 const express = require('express');
-//const bodyParser = require('body-parser');
 
 // Require Slack Node SDK web client
 const {
@@ -55,35 +54,6 @@ const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET);
 // Initialize an Express application
 // NOTE: You must use a body parser for the urlencoded format before attaching the adapter
 const app = express();
-/*
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({
-	extended: false
-}));
-*/
-app.post('/slack/commands', function(req, res) {
-
-	const {
-		token,
-		command
-	} = req.body;
-
-	console.log('<Slash Command> Received command', command);
-	if (token === process.env.SLACK_VERIFICATION_TOKEN) {
-		// respond immediately!
-		res.status(200).end();
-
-		if (req.body.command === '/storybot') {
-			storyBotTools.adminMenu(req.body);
-		} else {
-			console.error('<Slash Command> No matching command');
-		}
-	} else {
-		console.error('<Slash Command> Invalid Verification token. Received:', token, 'but wanted', process.env.SLACK_VERIFICATION_TOKEN);
-		//Bad token
-		res.sendStatus(500);
-	}
-});
 
 // Attach the adapter to the Express application as a middleware
 app.use('/slack/actions', slackInteractions.expressMiddleware());
@@ -204,6 +174,61 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 	}
 });
 
+////Secrets secrets are no fun
+const signedSecret = "foo"
+const bodyParser = require('body-parser');
+const crypto = require('crypto');
+
+app.use(bodyParser.urlencoded({
+	extended: false,
+	verify: function(req, res, body) {
+		req.rawBody = body.toString();
+	}
+}));
+app.use(bodyParser.json());
+
+app.post('/slack/commands', function(req, res) {
+	const timeStamp = req.headers['x-slack-request-timestamp'];
+	const slashSig = req.headers['x-slack-signature'];
+	const reqBody = JSON.stringify(req.body);
+	const baseString = `v0:${timeStamp}:${req.rawBody}`;
+
+	const hmac = crypto.createHmac('sha256', process.env.SLACK_SIGNING_SECRET);
+	JSON.stringify(hmac.update(baseString));
+	const mySignature = `v0=${hmac.digest(`hex`)}`;
+
+	console.log('My signature I generated is', mySignature);
+
+	if (mySignature == slashSig) {
+		console.log(`Success
+        Signature: ${mySignature}`);
+	} else {
+		console.log(`SIGNATURES DO NOT MATCH
+         Expected: ${mySignature}
+         Actual: ${slashSig}`);
+	}
+
+	const {
+		token,
+		command
+	} = req.body;
+
+	console.log('<Slash Command> Received command', command);
+	if (token === process.env.SLACK_VERIFICATION_TOKEN) {
+		// respond immediately!
+		res.status(200).end();
+
+		if (req.body.command === '/storybot') {
+			storyBotTools.adminMenu(req.body);
+		} else {
+			console.error('<Slash Command> No matching command');
+		}
+	} else {
+		console.error('<Slash Command> Invalid Verification token. Received:', token, 'but wanted', process.env.SLACK_VERIFICATION_TOKEN);
+		//Bad token
+		res.sendStatus(500);
+	}
+});
 
 // Select a port for the server to listen on.
 const port = process.env.PORT || 3000;
@@ -211,7 +236,6 @@ const port = process.env.PORT || 3000;
 // Start the express application server
 http.createServer(app).listen(port, () => {
 	console.log(`<Startup> server listening on port ${port}`);
-
 	storyBotTools.validateBotConnection();
 
 });
