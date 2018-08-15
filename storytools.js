@@ -31,13 +31,15 @@ exports.playbackScript = (config, event) => {
 	//console.log('<DEBUG> the event is', event);
 	const trigger_term = event.text + "-" + event.ts;
 
-	// Make it easy to cleanup the trigger term
-	addHistory(trigger_term, {
-		item: -1,
-		type: 'trigger',
-		channel: event.channel,
-		ts: event.ts
-	});
+	if (!config[event.text][0].delete_trigger) {
+		// Make it easy to cleanup the trigger term
+		addHistory(trigger_term, {
+			item: -1,
+			type: 'trigger',
+			channel: event.channel,
+			ts: event.ts
+		});
+	}
 
 	// Step through the script in order
 	async.eachSeries(config[event.text], function(action, callback) {
@@ -63,8 +65,13 @@ exports.playbackScript = (config, event) => {
 
 					if (action.type === 'botuser') {
 						if (action.target_item) {
-							target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
-							target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
+							if (action.target_item.indexOf('trigger') >= 0) {
+								target_ts = event.ts;
+								target_channel = event.channel;
+							} else {
+								target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
+								target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
+							}
 						}
 
 						if (action.reaction) {
@@ -96,6 +103,8 @@ exports.playbackScript = (config, event) => {
 								thread_ts: target_ts,
 								link_names: true,
 								unfurl_links: true,
+								icon_emoji: action.icon_emoji,
+								icon_url: action.icon_url,
 								attachments: action.attachments
 							}).then((res) => {
 								//Add what just happened to the history
@@ -253,23 +262,23 @@ exports.playbackScript = (config, event) => {
 									.catch(console.error);
 									break;
 								}
-							case 'post':
+							case 'file':
 								{
 									webClientBot.files.upload({
 										token: config['Tokens'].find(o => o.name === action.username).token,
 										channels: action.channel,
-										filetype: 'post',
+										filetype: action.filetype,
 										title: action.title,
 										initial_comment: action.text,
 										content: action.content
 									})
 									.then((res) => {
-										//			console.log('<DEBUG> API call for files.upload with params', params, 'had response', res);
+										console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
 												item: action.item,
 												type: action.type,
-												channel: res.channel,
+												channel: res.file.channels[0],
 												ts: res.file.id
 											}).then((res) => {
 												//Allow the async series to go forward
@@ -403,7 +412,7 @@ const deleteHistoryItem = (term) => {
 		return 'Well this is embarassing: ' + term + " doesn't exist in history";
 	} else {
 		for (let i = message_history[term].length - 1; i >= 0; i--) {
-			if (message_history[term][i].type === 'post') {
+			if (message_history[term][i].type === 'file') {
 				webClientBot.files.delete({
 						file: message_history[term][i].ts
 					}).then((res) => {
@@ -454,11 +463,28 @@ const deleteAllHistory = () => {
 	}
 }
 
+// Delete a message (or, if it's the first message in a thread, delete the whole thread)
 exports.deleteItem = (channel, ts) => {
-	webClientBot.chat.delete({
+
+	webClientBot.channels.replies({
 		channel: channel,
-		ts: ts
+		thread_ts: ts
+	}).then((res) => {
+		res.messages.forEach(function(message) {
+			webClientBot.chat.delete({
+				channel: channel,
+				ts: message.ts
+			}).catch(console.error);
+		});
+
 	}).catch(console.error);
+
+	/*
+		webClientBot.chat.delete({
+			channel: channel,
+			ts: ts
+		}).catch(console.error);
+		*/
 }
 
 // Get the list of all users and their IDs
@@ -755,7 +781,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 			dialog: callback.attachments
 		}
 		webClientBot.dialog.open(response).catch((err) => {
-			//	console.error('DIalog Open errored out with',err, 'and response_metadata',err.data.response_metadata);
+			console.error('DIalog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
 			console.error(err);
 		});
 

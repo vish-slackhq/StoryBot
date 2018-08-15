@@ -41,7 +41,8 @@ const {
 	createMessageAdapter
 } = require('@slack/interactive-messages');
 const {
-	createEventAdapter
+	createEventAdapter,
+	verifyRequestSignature
 } = require('@slack/events-api');
 
 // An access token (from your Slack app or custom integration - xoxp, xoxb, or xoxa)
@@ -77,7 +78,7 @@ slackEvents.on('message', (event) => {
 
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event) => {
-	// Put a :skull: on an item and the bot will kill it dead
+	// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
 	if (event.reaction === 'skull') {
 		storyBotTools.deleteItem(event.item.channel, event.item.ts);
 	}
@@ -166,16 +167,20 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanup);
 slackInteractions.action(/callback_/, (payload, respond) => {
 
+
 	if (callbackData.indexOf(payload.callback_id) >= 0) {
 		//		console.log('<Callback> DEBUG: matched callback with ', payload);
 		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
 	} else {
 		console.log('<Callback> No match in the config for', payload.callback_id);
 	}
+
+	//const reply = payload.original_message;
+	//delete reply.attachments[0].actions;
+	//return "";
 });
 
 ////Secrets secrets are no fun
-const signedSecret = "foo"
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 
@@ -188,6 +193,7 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json());
 
 app.post('/slack/commands', function(req, res) {
+
 	const timeStamp = req.headers['x-slack-request-timestamp'];
 	const slashSig = req.headers['x-slack-signature'];
 	const reqBody = JSON.stringify(req.body);
@@ -208,6 +214,12 @@ app.post('/slack/commands', function(req, res) {
          Actual: ${slashSig}`);
 	}
 
+	/*
+		verifyRequestSignature(
+			process.env.SLACK_SIGNING_SECRET,
+			req.headers['x-slack-signature'].toString(),
+			req.headers['x-slack-request-timestamp'].toString());
+	*/
 	const {
 		token,
 		command
