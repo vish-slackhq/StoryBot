@@ -192,7 +192,7 @@ exports.playbackScript = (config, event) => {
 
 									webClientBot.chat.postMessage(params)
 									.then((res) => {
-										console.log('<DEBUG> API call for Bot postMessage with params', params, 'had response', res.ok);
+									//	console.log('<DEBUG> API call for Bot postMessage with params', params, 'had response', res.ok);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
 												item: action.item,
@@ -768,8 +768,9 @@ exports.historyCleanup = (payload, respond) => {
 	respond(response).catch(console.error);
 }
 
+
 exports.callbackMatch = (payload, respond, callback) => {
-	console.log('<Callbacks> DEBUG - this is the payload', payload);
+	console.log('<CallbacksMatch> DEBUG - received', callback, 'this is the payload', payload);
 
 	let response = {
 		text: "default response"
@@ -780,8 +781,10 @@ exports.callbackMatch = (payload, respond, callback) => {
 			trigger_id: payload.trigger_id,
 			dialog: callback.attachments
 		}
-		webClientBot.dialog.open(response).catch((err) => {
-			console.error('DIalog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
+		webClientBot.dialog.open(response).then((res) => {
+			console.log('<Debug><Callbacks> Dialog.Open worked with result', res);
+		}).catch((err) => {
+			console.error('Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
 			console.error(err);
 		});
 
@@ -806,12 +809,6 @@ exports.callbackMatch = (payload, respond, callback) => {
 			as_user: false,
 			attachments: callback.attachments
 		};
-
-		/*
-				if (callback.thread) {
-					console.log('<DEBUG><Callback Thread>');
-					response.thread_ts = payload.action_ts;
-				}*/
 
 		if (callback.channel != 'current') {
 			response.channel = getChannelId(callback.channel);
@@ -843,7 +840,6 @@ exports.callbackMatch = (payload, respond, callback) => {
 							.catch(console.error);*/
 		}
 	}
-	const reply = payload.original_message;
-	delete reply.attachments[0].actions;
-	return reply;
+
+	return {text: "yoyoyoy"};
 }
