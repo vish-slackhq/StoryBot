@@ -447,7 +447,7 @@ const deleteHistoryItem = (term) => {
 						//				console.log('<DEBUG> just deleted a history item res is', res);
 					})
 					.catch((err) => {
-						console.error('<Error><deleteHistoryItem><chat.delete>', err);
+						console.error('<Error><deleteHistoryItem><chat.delete> for term',term, '\nError is', err);
 					});
 			}
 		}
