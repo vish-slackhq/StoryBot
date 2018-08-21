@@ -353,7 +353,8 @@ exports.playbackScript = (config, event) => {
 										share_channel: action.channel,
 										channel: target_channel,
 										timestamp: target_ts,
-										link_names: true
+										link_names: true,
+										unfurl_links: true
 									}
 
 									//Make the call
@@ -387,13 +388,29 @@ exports.playbackScript = (config, event) => {
 							case 'invite':
 								{
 
-									apiMethod = 'channels.invite';
-
-									params = {
+									webClientBot.channels.invite({
 										token: config['Tokens'].find(o => o.name === action.username).token,
-										channel: event.channel, //not ideal but don't feel like figuring out how to take channel name to channel ID for any channel
+										channel: getChannelId(action.channel),
 										user: getUserId(action.text)
-									}
+									})
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel.id,
+											ts: null
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><channels.invite>', err);
+									});
+
 									break;
 								}
 							default:
@@ -537,7 +554,7 @@ const buildUserList = (authBotId) => {
 					allUserIds = allUserIds + "," + user.id;
 				}
 			});
-	//		console.log('<DEBUG> buildUserList final list is', user_list);
+			//		console.log('<DEBUG> buildUserList final list is', user_list);
 		})
 		.catch((err) => {
 			console.error('<Error><buildUserList><users.list>', err);
@@ -624,7 +641,7 @@ exports.createChannels = (channelInfo) => {
 				name: channel.name
 			}).then((res) => {
 				//need to invite users to channel now
-				console.log('<DEBUG><Channel Create><channels.create> Success:',res)
+				console.log('<DEBUG><Channel Create><channels.create> Success:', res)
 				console.log('MEGA DEBUG trying to setPurpose for ', res.data.channel.id, ' do we havea purpose?', channel.purpose);
 
 				if (channel.purpose) {
