@@ -192,7 +192,7 @@ exports.playbackScript = (config, event) => {
 
 									webClientBot.chat.postMessage(params)
 									.then((res) => {
-									//	console.log('<DEBUG> API call for Bot postMessage with params', params, 'had response', res.ok);
+										//	console.log('<DEBUG> API call for Bot postMessage with params', params, 'had response', res.ok);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
 												item: action.item,
@@ -359,6 +359,7 @@ exports.playbackScript = (config, event) => {
 								}
 							case 'invite':
 								{
+
 									apiMethod = 'channels.invite';
 
 									params = {
@@ -796,6 +797,16 @@ exports.callbackMatch = (payload, respond, callback) => {
 			link_names: true,
 			attachments: callback.attachments
 		}).catch(console.error);
+	} else if (callback.invite) {
+		console.log('!!!!!!!!! invites');
+
+		response = {
+			user: getUserId(callback.username),
+			channel: payload.channel.id
+		}
+	console.log('INVITING to response',response);
+		webClientBot.channels.invite(response).catch(console.error);
+
 	} else {
 		response = {
 			channel: payload.channel.id,
@@ -841,5 +852,5 @@ exports.callbackMatch = (payload, respond, callback) => {
 		}
 	}
 
-	return {text: "yoyoyoy"};
+	//return {text: "yoyoyoy"};
 }

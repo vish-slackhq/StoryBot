@@ -241,6 +241,11 @@ app.post('/slack/commands', function(req, res) {
 	}
 });
 
+app.get('/', (req, res) => {
+  res.send('<h2>StoryBot is running</h2>');
+});
+
+
 // Select a port for the server to listen on.
 const port = process.env.PORT || 3000;
 
