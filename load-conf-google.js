@@ -14,7 +14,11 @@ exports.loadConfig = () => {
     // your google spreadhsheet key 
     spreadsheetKey: process.env.GSHEET_ID,
     // your google oauth2 credentials 
-    credentials: require(process.env.GOOGLE_API_CREDS || './google_sheets_creds.json'),
+ //   credentials: require(process.env.GOOGLE_API_CREDS || './google_sheets_creds.json'),
+ credentials: {
+  client_email: process.env.GOOGLE_CLIENT_EMAIL,
+  private_key: process.env.GOOGLE_PRIVATE_KEY
+ },
     // names of the sheet you want to extract (or [] for all) 
     sheetsToExtract: []
   }, function(err, data) {
