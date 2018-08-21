@@ -52,9 +52,10 @@ Supports:
 * Set up a /storybot command to your ngrok URL + /slack/commands
 * Event Subscriptions:
     * Setup Request URL with ngrok https URL + /slack/events
-    * Subscribe to ***Bot events*** for:
+    * Subscribe to ***Workspace events*** for:
         * message.channels
         * reaction_added
+        * other message.groups/IM if needed
 
 
 Generate legacy tokens for other users as needed and add to the Tokens sheet

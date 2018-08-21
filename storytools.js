@@ -765,13 +765,13 @@ exports.adminCallback = (payload, respond) => {
 
 					response = {
 						response_type: 'ephemeral',
-						replace_original: false,
+						replace_original: true,
 						attachments: attachments
 					};
 				} else {
 					response = {
 						response_type: 'ephemeral',
-						replace_original: false,
+						replace_original: true,
 						text: "No history right now"
 					}
 				}
