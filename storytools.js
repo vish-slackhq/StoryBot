@@ -537,7 +537,7 @@ const buildUserList = (authBotId) => {
 					allUserIds = allUserIds + "," + user.id;
 				}
 			});
-			//		console.log('<DEBUG> buildUserList final list is',user_list);
+	//		console.log('<DEBUG> buildUserList final list is', user_list);
 		})
 		.catch((err) => {
 			console.error('<Error><buildUserList><users.list>', err);
@@ -546,7 +546,10 @@ const buildUserList = (authBotId) => {
 
 // Look up User ID from a Name
 const getUserId = (name) => {
+	name = name.replace(/\s+/g, '');
+	console.log('Getting user ID for ', name);
 	let id = user_list.find(o => o.name === name).id;
+	console.log('Retrieved id', id, 'for user name', name);
 	return id;
 }
 
@@ -596,11 +599,10 @@ exports.createChannels = (channelInfo) => {
 	channelInfo.forEach(function(channel) {
 		console.log('<Debug><Create Channels> Creating for', channel);
 
-		let id = null;
-		id = getChannelId(channel.name);
+		let id = getChannelId(channel.name);
 		let userIdsToInvite = [];
 
-		console.log('<Debug> Getting ready to do the check for who to invite for channel',channel.name,'with id', id);
+		console.log('<Debug> Getting ready to do the check for who to invite for channel', channel.name, 'with id', id);
 
 		if (channel.users === 'all') {
 			userIdsToInvite = allUserIds;
@@ -619,26 +621,27 @@ exports.createChannels = (channelInfo) => {
 			console.log('<DEBUG><Create Channels> Creating the new channel', channel.name);
 
 			webClientBot.channels.create({
-				name: channel.name,
+				name: channel.name
 			}).then((res) => {
 				//need to invite users to channel now
+				console.log('<DEBUG><Channel Create><channels.create> Success:',res)
+				console.log('MEGA DEBUG trying to setPurpose for ', res.data.channel.id, ' do we havea purpose?', channel.purpose);
 
-				/*	console.log('MEGA DEBUG trying to setPurpose for ',res.data.channel.id,' do we havea purpose?',channel.purpose);
-
-					if (channel.purpose) {
-						webClientBot.channels.setPurpose({
-							channel: res.data.channel.id,
-							purpose: channel.purpose
-						}).then((res) => {
-							console.log('<DEBUG><Channel Purpose>', res.data);
-						}).catch(console.error);
-					}*/
+				if (channel.purpose) {
+					webClientBot.channels.setPurpose({
+						channel: res.data.channel.id,
+						purpose: channel.purpose
+					}).then((res) => {
+						console.log('<DEBUG><Channel Purpose>', res.data);
+					}).catch(console.error);
+				}
 				console.log('<DEBUG><Invite Users> About to invite users to new channel ID', res.data.channel.id);
 				inviteUsersToChannel(res.data.channel.id, userIdsToInvite);
 
 			}).catch((err) => {
-				console.log('<Error><ChannelCreate>', err.data);
+				console.log('<Error><ChannelCreate>', err);
 			});
+
 		}
 	});
 }
