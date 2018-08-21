@@ -53,7 +53,9 @@ exports.playbackScript = (config, event) => {
 				webClientBot.chat.delete({
 					channel: event.channel,
 					ts: event.ts
-				}).catch(console.error);
+				}).catch((err) => {
+					console.error('<Error><Main Loop><chat.delete trigger message>', err);
+				});
 			}
 
 			//Delay the item if specified, then execute the rest
@@ -92,8 +94,12 @@ exports.playbackScript = (config, event) => {
 									}).then((res) => {
 										//Allow the async series to go forward
 										callback();
-									}).catch(console.error);
-								}).catch(console.error);
+									}).catch((err) => {
+										console.error('<Error><Main Loop><addHistory>', err);
+									});
+								}).catch((err) => {
+									console.error('<Error><Main Loop><reactions.add>', err);
+								});
 						} else {
 							webClientBot.chat.postMessage({
 								as_user: false,
@@ -109,16 +115,19 @@ exports.playbackScript = (config, event) => {
 							}).then((res) => {
 								//Add what just happened to the history
 								addHistory(trigger_term, {
-										item: action.item,
-										type: action.type,
-										channel: res.channel,
-										ts: res.ts
-									}).then((res) => {
-										//Allow the async series to go forward
-										callback();
-									})
-									.catch(console.error);
-							}).catch(console.error);
+									item: action.item,
+									type: action.type,
+									channel: res.channel,
+									ts: res.ts
+								}).then((res) => {
+									//Allow the async series to go forward
+									callback();
+								}).catch((err) => {
+									console.error('<Error><Main Loop><addHistory>', err);
+								});
+							}).catch((err) => {
+								console.error('<Error><Main Loop><chat.postMessage>', err);
+							});
 						}
 					} else {
 
@@ -158,17 +167,20 @@ exports.playbackScript = (config, event) => {
 										//			console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res.ok);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
-												item: action.item,
-												type: action.type,
-												channel: res.channel,
-												ts: res.ts
-											}).then((res) => {
-												//Allow the async series to go forward
-												callback();
-											})
-											.catch(console.error);
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+										});
 									})
-									.catch(console.error);
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postMessage>', err);
+									});
 									break;
 								}
 							case 'bot':
@@ -195,17 +207,20 @@ exports.playbackScript = (config, event) => {
 										//	console.log('<DEBUG> API call for Bot postMessage with params', params, 'had response', res.ok);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
-												item: action.item,
-												type: action.type,
-												channel: res.channel,
-												ts: res.ts
-											}).then((res) => {
-												//Allow the async series to go forward
-												callback();
-											})
-											.catch(console.error);
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+										});
 									})
-									.catch(console.error);
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postMessage>', err);
+									});
 									break;
 								}
 							case 'reaction':
@@ -222,19 +237,21 @@ exports.playbackScript = (config, event) => {
 										//		console.log('<DEBUG> API call for reactions.add with params', params, 'had response', res.ok);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
-												item: action.item,
-												type: action.type,
-												channel: res.channel,
-												ts: res.ts
-											}).then((res) => {
-												//Allow the async series to go forward
-												callback();
-											})
-											.catch(console.error);
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+										});
 									})
-									.catch(console.error);
+									.catch((err) => {
+										console.error('<Error><Main Loop><reactions.add>', err);
+									});
 									break;
-
 								}
 							case 'ephemeral':
 								{
@@ -249,17 +266,20 @@ exports.playbackScript = (config, event) => {
 										//			console.log('<DEBUG> API call for postEphemeral with params', params, 'had response', res);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
-												item: action.item,
-												type: action.type,
-												channel: res.channel,
-												ts: res.message_ts
-											}).then((res) => {
-												//Allow the async series to go forward
-												callback();
-											})
-											.catch(console.error);
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.message_ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+										});
 									})
-									.catch(console.error);
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postEphemeral>', err);
+									});
 									break;
 								}
 							case 'file':
@@ -276,17 +296,20 @@ exports.playbackScript = (config, event) => {
 										console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
-												item: action.item,
-												type: action.type,
-												channel: res.file.channels[0],
-												ts: res.file.id
-											}).then((res) => {
-												//Allow the async series to go forward
-												callback();
-											})
-											.catch(console.error);
+											item: action.item,
+											type: action.type,
+											channel: res.file.channels[0],
+											ts: res.file.id
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+										});
 									})
-									.catch(console.error);
+									.catch((err) => {
+										console.error('<Error><Main Loop><files.upload>', err);
+									});
 									break;
 								}
 							case 'status':
@@ -304,18 +327,20 @@ exports.playbackScript = (config, event) => {
 										//console.log('<DEBUG> API call for users.profile.set had response', res);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
-												item: action.item,
-												type: action.type,
-												username: res.username,
-												ts: res.message_ts
-											}).then((res) => {
-												//Allow the async series to go forward
-												callback();
-											})
-											.catch(console.error);
+											item: action.item,
+											type: action.type,
+											username: res.username,
+											ts: res.message_ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+										});
 									})
-									.catch(console.error);
-
+									.catch((err) => {
+										console.error('<Error><Main Loop><users.profile.set>', err);
+									});
 									break;
 								}
 							case 'share':
@@ -350,6 +375,8 @@ exports.playbackScript = (config, event) => {
 										}).then((result) => {
 											//Allow the async series to go forward
 											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
 										});
 									}).catch((err) => {
 										console.error('API call for ', apiMethod, 'resulted in: ', err);
@@ -447,7 +474,7 @@ const deleteHistoryItem = (term) => {
 						//				console.log('<DEBUG> just deleted a history item res is', res);
 					})
 					.catch((err) => {
-						console.error('<Error><deleteHistoryItem><chat.delete> for term',term, '\nError is', err);
+						console.error('<Error><deleteHistoryItem><chat.delete> for term', term, '\nError is', err);
 					});
 			}
 		}

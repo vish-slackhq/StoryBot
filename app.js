@@ -46,7 +46,7 @@ const {
 } = require('@slack/events-api');
 
 // An access token (from your Slack app or custom integration - xoxp, xoxb, or xoxa)
-const token = process.env.SLACK_BOT_TOKEN;
+//const token = process.env.SLACK_BOT_TOKEN;
 
 // Create the adapter using the app's verification token, read from environment variable
 const slackInteractions = createMessageAdapter(process.env.SLACK_SIGNING_SECRET);
