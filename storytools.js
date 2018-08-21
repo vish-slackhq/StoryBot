@@ -339,7 +339,7 @@ exports.playbackScript = (config, event) => {
 											ts = result.data.file.id;
 										}
 
-										console.error('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
+										console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
 
 										//Add what just happened to the history
 										addHistory(trigger_term, {
@@ -376,7 +376,9 @@ exports.playbackScript = (config, event) => {
 						}
 					}
 				})
-				.catch(console.error);
+				.catch((err) => {
+					console.error('<Error><Delay><Main Loop>', err);
+				});
 		}
 	})
 	//.catch(console.error);
@@ -419,7 +421,9 @@ const deleteHistoryItem = (term) => {
 					}).then((res) => {
 						//					console.log('<DEBUG> just deleted a history item res is', res);
 					})
-					.catch(console.error);
+					.catch((err) => {
+						console.error('<Error><deleteHistoryItem><files.delete>', err);
+					});
 			} else if (message_history[term][i].type === 'status') {
 				webClientBot.users.profile.set({
 						//	token: config['Tokens'].find(o => o.name === message_history[term][i].username).token,
@@ -432,7 +436,9 @@ const deleteHistoryItem = (term) => {
 					.then((res) => {
 						//			console.log('<DEBUG> just deleted a history item res is', res);
 					})
-					.catch(console.error);
+					.catch((err) => {
+						console.error('<Error><deleteHistoryItem><users.profile.set>', err);
+					});
 			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) {
 				webClientBot.chat.delete({
 						channel: message_history[term][i].channel,
@@ -440,7 +446,9 @@ const deleteHistoryItem = (term) => {
 					}).then((res) => {
 						//				console.log('<DEBUG> just deleted a history item res is', res);
 					})
-					.catch(console.error);
+					.catch((err) => {
+						console.error('<Error><deleteHistoryItem><chat.delete>', err);
+					});
 			}
 		}
 		delete message_history[term];
@@ -478,8 +486,9 @@ exports.deleteItem = (channel, ts) => {
 			}).catch(console.error);
 		});
 
-	}).catch(console.error);
-
+	}).catch((err) => {
+		console.error('<Error><deleteItem><chat.delete>', err);
+	});
 	/*
 		webClientBot.chat.delete({
 			channel: channel,
@@ -503,7 +512,9 @@ const buildUserList = (authBotId) => {
 			});
 			//		console.log('<DEBUG> buildUserList final list is',user_list);
 		})
-		.catch(console.error);
+		.catch((err) => {
+			console.error('<Error><buildUserList><users.list>', err);
+		});
 }
 
 // Look up User ID from a Name
@@ -523,7 +534,9 @@ const getChannelList = () => {
 			//		console.log('DEBUG: channels res:',res);
 			channel_list = res.channels;
 		})
-		.catch(console.log);
+		.catch((err) => {
+			console.error('<Error><getChannelListm><channels.list>', err);
+		});
 }
 
 // Look up Channel ID from a Name
@@ -619,7 +632,9 @@ exports.validateBotConnection = () => {
 			getChannelList();
 
 		})
-		.catch(console.error);
+		.catch((err) => {
+			console.error('<Error><validateBotConnection><auth.test>', err);
+		});
 
 }
 
@@ -686,7 +701,9 @@ exports.adminMenu = (body) => {
 		replace_original: true
 	}).then((res) => {
 		//	console.log('<Slash Command> Called webhook');
-	}).catch(console.error);
+	}).catch((err) => {
+		console.error('<Error><Admin Menu><webhook.send>', err);
+	});
 }
 
 // Handle the admin menu callbacks
@@ -785,7 +802,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 		webClientBot.dialog.open(response).then((res) => {
 			console.log('<Debug><Callbacks> Dialog.Open worked with result', res);
 		}).catch((err) => {
-			console.error('Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
+			console.error('<Error><callbackMatch><dialog.open> Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
 			console.error(err);
 		});
 
@@ -796,7 +813,9 @@ exports.callbackMatch = (payload, respond, callback) => {
 			as_user: false,
 			link_names: true,
 			attachments: callback.attachments
-		}).catch(console.error);
+		}).catch((err) => {
+			console.error('<Error><callbackMatch><chat.postEphemeral>', err);
+		});
 	} else if (callback.invite) {
 		console.log('!!!!!!!!! invites');
 
@@ -804,8 +823,10 @@ exports.callbackMatch = (payload, respond, callback) => {
 			user: getUserId(callback.username),
 			channel: payload.channel.id
 		}
-	console.log('INVITING to response',response);
-		webClientBot.channels.invite(response).catch(console.error);
+		console.log('INVITING to response', response);
+		webClientBot.channels.invite(response).catch((err) => {
+			console.error('<Error><callbackMatch><channels.invite>', err);
+		});;
 
 	} else {
 		response = {
@@ -827,11 +848,15 @@ exports.callbackMatch = (payload, respond, callback) => {
 
 		if (callback.update) {
 			//	console.log('<Callbacks> DEBUG - this is an update, using', response);
-			webClientBot.chat.update(response).catch(console.error);
+			webClientBot.chat.update(response).catch((err) => {
+				console.error('<Error><callbackMatch><chat.update>', err);
+			});
 
 		} else {
 			console.log('<Callbacks> DEBUG - this is a new message, using', response);
-			webClientBot.chat.postMessage(response).catch(console.error);
+			webClientBot.chat.postMessage(response).catch((err) => {
+				console.error('<Error><callbackMatch><chat.postMessage>', err);
+			});;
 			/*
 						webClientBot.chat.postMessage(response)
 							.then((res) => {

@@ -118,7 +118,9 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 						response_type: 'ephemeral',
 						replace_original: true,
 						attachments: attachments
-					}).catch(console.error);
+					}).catch((err) => {
+						console.error('<Error><Admin Menu><Triggers>', err);
+					});
 				}
 				break;
 			}
@@ -141,7 +143,9 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 					text: "OK! I'm re-loading!",
 					response_type: 'ephemeral',
 					replace_original: true
-				}).catch(console.error);
+				}).catch((err) => {
+					console.error('<Error><Admin Menu><Reload Config>', err);
+				});
 				break;
 			}
 		case 'Create Channels':
@@ -153,7 +157,9 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 					text: "Creating channels now",
 					response_type: 'ephemeral',
 					replace_original: true
-				}).catch(console.error);
+				}).catch((err) => {
+					console.error('<Error><Admin Menu><Create Channels>', err);
+				});
 				break;
 			}
 		default:
@@ -168,7 +174,7 @@ slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanu
 
 
 slackInteractions.action(/callback_/, (payload, respond) => {
-	
+
 	if (callbackData.indexOf(payload.callback_id) >= 0) {
 		console.log('<Callback> DEBUG: matched callback for with ', payload.callback_id);
 		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
@@ -242,7 +248,7 @@ app.post('/slack/commands', function(req, res) {
 });
 
 app.get('/', (req, res) => {
-  res.send('<h2>StoryBot is running</h2>');
+	res.send('<h2>StoryBot is running</h2>');
 });
 
 
