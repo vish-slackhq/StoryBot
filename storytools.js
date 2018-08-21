@@ -581,7 +581,7 @@ const getChannelId = (name) => {
 }
 
 const inviteUsersToChannel = (channelId, userIdList) => {
-	console.log('<Debug><Create Channels> Inviting users to channel ID', channelId, 'now for userIds', userIdList);
+	console.log('<Debug><inviteUsersToChannel> Inviting users to channel ID', channelId, 'now for userIds', userIdList);
 	webClientBot.channels.invite({
 		channel: channelId,
 		users: userIdList
@@ -596,10 +596,11 @@ exports.createChannels = (channelInfo) => {
 	channelInfo.forEach(function(channel) {
 		console.log('<Debug><Create Channels> Creating for', channel);
 
-		let id = getChannelId(channel.name);
+		let id = null;
+		id = getChannelId(channel.name);
 		let userIdsToInvite = [];
 
-		console.log('<MEGA DEBUG> Get ready about to do it but the id is', id);
+		console.log('<Debug> Getting ready to do the check for who to invite for channel',channel.name,'with id', id);
 
 		if (channel.users === 'all') {
 			userIdsToInvite = allUserIds;
@@ -609,7 +610,7 @@ exports.createChannels = (channelInfo) => {
 			});
 		}
 
-		console.log('<MEGA DEBUG> We made it here so id is', id, 'and userIdsToInvite is', userIdsToInvite);
+		console.log('<MEGA DEBUG> About to figure out which Invite to do with ', id, 'and userIdsToInvite is', userIdsToInvite);
 
 		if (id) {
 			console.log('<DEBUG><Invite Users> Found an existing channel', channel.name, 'matched with', id);
