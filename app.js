@@ -136,7 +136,11 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 							callbackData.push(callback.callback_name);
 						});
 					}
-					console.log('<Loading> Loaded config for keys:', triggerKeys, 'and Callbacks are:', callbackData);
+					console.log('<Re-Loading> Loaded config for keys:', triggerKeys, 'and Callbacks are:', callbackData);
+
+					console.log('<Re-Loading>re-validating Bot Connection / building channel list');
+					storyBotTools.validateBotConnection();
+
 				});
 
 				respond({
