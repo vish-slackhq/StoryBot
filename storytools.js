@@ -872,9 +872,13 @@ exports.callbackMatch = (payload, respond, callback) => {
 			channel: payload.channel.id
 		}
 		console.log('INVITING response', response);
-		webClientBot.channels.invite(response).catch((err) => {
-			console.error('<Error><callbackMatch><channels.invite>', err);
-		});;
+		//Delay the item if specified, then execute the rest
+		delay(callback.delay * 1000)
+			.then((res) => {
+				webClientBot.channels.invite(response).catch((err) => {
+					console.error('<Error><callbackMatch><channels.invite>', err);
+				});;
+			}).catch(console.error);
 
 	}
 
