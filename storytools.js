@@ -867,8 +867,6 @@ exports.callbackMatch = (payload, respond, callback) => {
 		});
 	}
 	if (callback.invite) {
-		console.log('!!!!!!!!! invites');
-
 		response = {
 			user: getUserId(callback.username),
 			channel: payload.channel.id
@@ -881,7 +879,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 	}
 
 	// try this to let multiple types of actions happen on a single callback script line
-	if (!callback.dialog && !callback.ephemeral && !callback.invite) {
+	if ((!callback.dialog && !callback.ephemeral && !callback.invite) || (callback.invite && callback.update)) {
 		response = {
 			channel: payload.channel.id,
 			text: callback.text,
