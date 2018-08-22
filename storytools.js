@@ -854,7 +854,8 @@ exports.callbackMatch = (payload, respond, callback) => {
 			console.error(err);
 		});
 
-	} else if (callback.ephemeral) {
+	}
+	if (callback.ephemeral) {
 		webClientBot.chat.postEphemeral({
 			user: payload.user.id,
 			channel: payload.channel.id,
@@ -864,19 +865,23 @@ exports.callbackMatch = (payload, respond, callback) => {
 		}).catch((err) => {
 			console.error('<Error><callbackMatch><chat.postEphemeral>', err);
 		});
-	} else if (callback.invite) {
+	}
+	if (callback.invite) {
 		console.log('!!!!!!!!! invites');
 
 		response = {
 			user: getUserId(callback.username),
 			channel: payload.channel.id
 		}
-		console.log('INVITING to response', response);
+		console.log('INVITING response', response);
 		webClientBot.channels.invite(response).catch((err) => {
 			console.error('<Error><callbackMatch><channels.invite>', err);
 		});;
 
-	} else {
+	}
+
+	// try this to let multiple types of actions happen on a single callback script line
+	if (!callback.dialog && !callback.ephemeral && !callback.invite) {
 		response = {
 			channel: payload.channel.id,
 			text: callback.text,
