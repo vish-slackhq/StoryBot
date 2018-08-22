@@ -393,7 +393,7 @@ exports.playbackScript = (config, event) => {
 										token: config['Tokens'].find(o => o.name === action.username).token,
 										comment: action.text,
 										channel: getChannelId(action.channel),
-										file: target_ts
+										file: action.target_item
 									}
 
 									//Make the call
