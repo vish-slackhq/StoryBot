@@ -387,12 +387,12 @@ exports.playbackScript = (config, event) => {
 								}
 								case 'sharefile':
 								{
-									apiMethod = 'chat.shareMessage';
+									apiMethod = 'files.share';
 
 									params = {
 										token: config['Tokens'].find(o => o.name === action.username).token,
 										comment: action.text,
-										channel: target_channel,
+										channel: getChannelId(action.channel),
 										file: target_ts
 									}
 
