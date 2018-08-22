@@ -385,6 +385,45 @@ exports.playbackScript = (config, event) => {
 
 									break;
 								}
+								case 'sharefile':
+								{
+									apiMethod = 'chat.shareMessage';
+
+									params = {
+										token: config['Tokens'].find(o => o.name === action.username).token,
+										comment: action.text,
+										channel: target_channel,
+										file: target_ts
+									}
+
+									//Make the call
+									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
+									.then((result) => {
+										let ts = result.data.ts;
+										if (action.type === 'post') {
+											ts = result.data.file.id;
+										}
+
+										console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
+
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: result.data.channel,
+											ts: ts
+										}).then((result) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+										});
+									}).catch((err) => {
+										console.error('API call for ', apiMethod, 'resulted in: ', err);
+									});
+
+									break;
+								}
 							case 'invite':
 								{
 
