@@ -180,7 +180,7 @@ slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanu
 slackInteractions.action(/callback_/, (payload, respond) => {
 
 	if (callbackData.indexOf(payload.callback_id) >= 0) {
-		console.log('<Callback> DEBUG: matched callback for with ', payload.callback_id);
+//		console.log('<Callback> DEBUG: matched callback for with ', payload.callback_id);
 		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
 	} else {
 		console.log('<Callback> No match in the config for', payload.callback_id);
@@ -212,7 +212,7 @@ app.post('/slack/commands', function(req, res) {
 	JSON.stringify(hmac.update(baseString));
 	const mySignature = `v0=${hmac.digest(`hex`)}`;
 
-	console.log('My signature I generated is', mySignature);
+	//console.log('My signature I generated is', mySignature);
 
 	if (mySignature == slashSig) {
 		console.log(`Success

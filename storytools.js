@@ -879,7 +879,7 @@ exports.historyCleanup = (payload, respond) => {
 
 
 exports.callbackMatch = (payload, respond, callback) => {
-	console.log('<CallbacksMatch> DEBUG - received', callback, 'this is the payload', payload);
+	//console.log('<CallbacksMatch> DEBUG - received', callback, 'this is the payload', payload);
 
 	let response = {
 		text: "default response"
@@ -910,16 +910,19 @@ exports.callbackMatch = (payload, respond, callback) => {
 		});
 	}
 	if (callback.invite) {
-		response = {
-			user: getUserId(callback.username),
-			channel: payload.channel.id
-		}
-		console.log('INVITING response', response);
+
 		//Delay the item if specified, then execute the rest
 		delay(callback.delay * 1000)
 			.then((res) => {
+				response = {
+					user: getUserId(callback.username),
+					channel: payload.channel.id
+				}
+				console.log('INVITING response', response);
+
 				webClientBot.channels.invite(response).catch((err) => {
-					console.error('<Error><callbackMatch><channels.invite>', err);
+					console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:'
+						err);
 				});;
 			}).catch(console.error);
 
