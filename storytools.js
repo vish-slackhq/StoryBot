@@ -921,8 +921,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 				console.log('INVITING response', response);
 
 				webClientBot.channels.invite(response).catch((err) => {
-					console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:'
-						err);
+					console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:', err);
 				});;
 			}).catch(console.error);
 
