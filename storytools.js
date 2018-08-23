@@ -385,39 +385,43 @@ exports.playbackScript = (config, event) => {
 
 									break;
 								}
-								case 'sharefile':
+							case 'sharefile':
 								{
 									apiMethod = 'files.share';
+									let sharefileChannelId = getChannelId(action.channel);
 
 									params = {
 										token: config['Tokens'].find(o => o.name === action.username).token,
 										comment: action.text,
-										channel: getChannelId(action.channel),
+										channel: sharefileChannelId,
 										file: action.target_item
 									}
 
 									//Make the call
 									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
 									.then((result) => {
-										let ts = result.data.ts;
-										if (action.type === 'post') {
-											ts = result.data.file.id;
-										}
-
 										console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
 
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: result.data.channel,
-											ts: ts
-										}).then((result) => {
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-										});
+										webClientBot.files.info({
+											file: action.target_item
+										}).then((res) => {
+
+											//Add what just happened to the history
+											addHistory(trigger_term, {
+												item: action.item,
+												type: 'message',
+												channel: sharefileChannelId,
+												ts: res.file.shares.public[sharefileChannelId][0].ts
+											}).then((result) => {
+
+												//Allow the async series to go forward
+												callback();
+											}).catch((err) => {
+												console.error('<Error><Main Loop><addHistory>', err);
+											});
+
+										}).catch(console.error);
+
 									}).catch((err) => {
 										console.error('API call for ', apiMethod, 'resulted in: ', err);
 									});
