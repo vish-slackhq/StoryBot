@@ -66,9 +66,9 @@ const storyBotTools = require('./storytools.js');
 
 // Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
 slackEvents.on('message', (event) => {
-	//	console.log(`Received a message event: user ${event.user} in channel ${event.channel} says ${event.text}`);
+//	console.log(`Received a message event: user ${event.user} in channel ${event.channel} says ${event.text}`);
 
-	if (event.type === 'message' && !event.bot_id) {
+	if (event.type === 'message') { //&& !event.bot_id) {
 		// Matched a trigger from a user so playback the story
 		if (triggerKeys.indexOf(event.text) >= 0) {
 			storyBotTools.playbackScript(scriptConfig.config, event);
