@@ -293,7 +293,7 @@ exports.playbackScript = (config, event) => {
 										content: action.content
 									})
 									.then((res) => {
-										console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
+								//		console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
 											item: action.item,
@@ -365,7 +365,7 @@ exports.playbackScript = (config, event) => {
 											ts = result.data.file.id;
 										}
 
-										console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
+									//	console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
 
 										//Add what just happened to the history
 										addHistory(trigger_term, {
@@ -400,7 +400,7 @@ exports.playbackScript = (config, event) => {
 									//Make the call
 									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
 									.then((result) => {
-										console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
+								//		console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
 
 										webClientBot.files.info({
 											file: action.target_item
@@ -607,9 +607,9 @@ const buildUserList = (authBotId) => {
 // Look up User ID from a Name
 const getUserId = (name) => {
 	name = name.replace(/\s+/g, '');
-	console.log('Getting user ID for ', name);
+//	console.log('Getting user ID for ', name);
 	let id = user_list.find(o => o.name === name).id;
-	console.log('Retrieved id', id, 'for user name', name);
+//	console.log('Retrieved id', id, 'for user name', name);
 	return id;
 }
 
@@ -631,7 +631,7 @@ const getChannelList = () => {
 
 // Look up Channel ID from a Name
 const getChannelId = (name) => {
-	console.log('<DEBUG><getChannelId> Called for name', name);
+//	console.log('<DEBUG><getChannelId> Called for name', name);
 
 	let result = null;
 
@@ -639,12 +639,12 @@ const getChannelId = (name) => {
 		result = channel_list.find(channel => channel.name === name).id;
 	}
 
-	console.log('<DEBUG><getChannelId> Called for name', name, 'with result id', result);
+//	console.log('<DEBUG><getChannelId> Called for name', name, 'with result id', result);
 	return result;
 }
 
 const inviteUsersToChannel = (channelId, userIdList) => {
-	console.log('<Debug><inviteUsersToChannel> Inviting users to channel ID', channelId, 'now for userIds', userIdList);
+//	console.log('<Debug><inviteUsersToChannel> Inviting users to channel ID', channelId, 'now for userIds', userIdList);
 	webClientBot.channels.invite({
 		channel: channelId,
 		users: userIdList
@@ -891,7 +891,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 			dialog: callback.attachments
 		}
 		webClientBot.dialog.open(response).then((res) => {
-			console.log('<Debug><Callbacks> Dialog.Open worked with result', res);
+	//		console.log('<Debug><Callbacks> Dialog.Open worked with result', res);
 		}).catch((err) => {
 			console.error('<Error><callbackMatch><dialog.open> Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
 			console.error(err);
@@ -918,7 +918,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 					user: getUserId(callback.username),
 					channel: payload.channel.id
 				}
-				console.log('INVITING response', response);
+//				console.log('INVITING response', response);
 
 				webClientBot.channels.invite(response).catch((err) => {
 					console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:', err);
@@ -953,7 +953,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 			});
 
 		} else {
-			console.log('<Callbacks> DEBUG - this is a new message, using', response);
+	//		console.log('<Callbacks> DEBUG - this is a new message, using', response);
 			webClientBot.chat.postMessage(response).catch((err) => {
 				console.error('<Error><callbackMatch><chat.postMessage>', err);
 			});;
