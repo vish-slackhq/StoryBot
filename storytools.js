@@ -526,7 +526,7 @@ const deleteHistoryItem = (term) => {
 					.catch((err) => {
 						console.error('<Error><deleteHistoryItem><users.profile.set>', err);
 					});
-			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) {
+			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral') && !(message_history[term][i].type === 'trigger')) {
 				webClientBot.chat.delete({
 						channel: message_history[term][i].channel,
 						ts: message_history[term][i].ts
