@@ -78,9 +78,23 @@ slackEvents.on('message', (event) => {
 
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event) => {
+//	console.log('INCOMING REACTION EVENT: ',event);
 	// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
 	if (event.reaction === 'skull') {
 		storyBotTools.deleteItem(event.item.channel, event.item.ts);
+	} else {
+		// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!!
+		// Use a unique reacji vs one being used elsewhere in the scripts
+		if (triggerKeys.indexOf(':' + event.reaction + ':') >= 0) {
+
+			let reaction_event = {
+				channel: event.item.channel,
+				ts: event.item.ts,
+				text: ':' + event.reaction + ':'
+			};
+
+			storyBotTools.playbackScript(scriptConfig.config, reaction_event);
+		}
 	}
 });
 
