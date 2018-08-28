@@ -71,7 +71,7 @@ slackEvents.on('message', (event) => {
 	if (event.type === 'message') { //&& !event.bot_id) {
 		// Matched a trigger from a user so playback the story
 		//		if (triggerKeys.toLowerCase().indexOf(event.text.toLowerCase()) >= 0) {
-		console.log('<DEBUG CASE> calling indexOfIgnoreCase with array=',triggerKeys,'and string',event.text);
+//		console.log('<DEBUG CASE> calling indexOfIgnoreCase with array=',triggerKeys,'and string',event.text);
 		let indexMatch = indexOfIgnoreCase(triggerKeys, event.text);
 	//	console.log('<DEBUG CASE CONFIG with index',indexMatch, 'in the config is',scriptConfig.config[triggerKeys[indexMatch]]);
 		if (indexMatch >= 0) {
