@@ -27,11 +27,12 @@ var channel_list = [];
 var botID;
 
 
-exports.playbackScript = (config, event) => {
-	//console.log('<DEBUG> the event is', event);
+exports.playbackScript = (config, tokens, event) => {
+//	console.log('<DEBUG> the event is', event);
+//console.log('<DEBUG> and the config passed in is',config);
 	const trigger_term = event.text + "-" + event.ts;
 
-	if (!config[event.text][0].delete_trigger) {
+	if (!config[0].delete_trigger) {
 		// Make it easy to cleanup the trigger term
 		addHistory(trigger_term, {
 			item: -1,
@@ -42,7 +43,7 @@ exports.playbackScript = (config, event) => {
 	}
 
 	// Step through the script in order
-	async.eachSeries(config[event.text], function(action, callback) {
+	async.eachSeries(config, function(action, callback) {
 
 		// Ignore blank lines that may have been ingested for some reason 
 		if (action.type) {
@@ -138,8 +139,13 @@ exports.playbackScript = (config, event) => {
 								target_ts = action.target_ts;
 								target_channel = action.target_channel;
 							} else if (action.target_item.indexOf('trigger') >= 0) {
-								target_ts = event.ts;
+								if (action.type === 'reply') {
+									target_ts = event.thread_ts;
+								} else {
+									target_ts = event.ts;
+								}
 								target_channel = event.channel;
+
 							} else {
 								target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
 								target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
@@ -155,7 +161,7 @@ exports.playbackScript = (config, event) => {
 							case 'reply':
 								{
 									webClientBot.chat.postMessage({
-										token: config['Tokens'].find(o => o.name === action.username).token,
+										token: tokens.find(o => o.name === action.username).token,
 										as_user: true,
 										username: action.username,
 										channel: action.channel,
@@ -228,7 +234,7 @@ exports.playbackScript = (config, event) => {
 							case 'reaction':
 								{
 									webClientBot.reactions.add({
-										token: config['Tokens'].find(o => o.name === action.username).token,
+										token: tokens.find(o => o.name === action.username).token,
 										as_user: true,
 										username: action.username,
 										channel: target_channel,
@@ -287,7 +293,7 @@ exports.playbackScript = (config, event) => {
 							case 'file':
 								{
 									webClientBot.files.upload({
-										token: config['Tokens'].find(o => o.name === action.username).token,
+										token: tokens.find(o => o.name === action.username).token,
 										channels: action.channel,
 										filetype: action.filetype,
 										title: action.title,
@@ -320,7 +326,7 @@ exports.playbackScript = (config, event) => {
 
 									webClientBot.users.profile.set({
 										//user: getUserId(action.username),
-										token: config['Tokens'].find(o => o.name === action.username).token,
+										token: tokens.find(o => o.name === action.username).token,
 										profile: {
 											"status_text": action.text,
 											"status_emoji": action.reaction
@@ -351,7 +357,7 @@ exports.playbackScript = (config, event) => {
 									apiMethod = 'chat.shareMessage';
 
 									params = {
-										token: config['Tokens'].find(o => o.name === action.username).token,
+										token: tokens.find(o => o.name === action.username).token,
 										text: action.text,
 										share_channel: action.channel,
 										channel: target_channel,
@@ -394,7 +400,7 @@ exports.playbackScript = (config, event) => {
 									let sharefileChannelId = getChannelId(action.channel);
 
 									params = {
-										token: config['Tokens'].find(o => o.name === action.username).token,
+										token: tokens.find(o => o.name === action.username).token,
 										comment: action.text,
 										channel: sharefileChannelId,
 										file: action.target_item
@@ -435,7 +441,7 @@ exports.playbackScript = (config, event) => {
 								{
 
 									webClientBot.channels.invite({
-										token: config['Tokens'].find(o => o.name === action.username).token,
+										token: tokens.find(o => o.name === action.username).token,
 										channel: getChannelId(action.channel),
 										user: getUserId(action.text)
 									})
@@ -609,6 +615,7 @@ const buildUserList = (authBotId) => {
 
 // Look up User ID from a Name
 const getUserId = (name) => {
+	//remove any spaces in the names from the list
 	name = name.replace(/\s+/g, '');
 	//	console.log('Getting user ID for ', name);
 	let id = user_list.find(o => o.name === name).id;

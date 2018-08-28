@@ -66,19 +66,23 @@ const storyBotTools = require('./storytools.js');
 
 // Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
 slackEvents.on('message', (event) => {
-//	console.log(`Received a message event: user ${event.user} in channel ${event.channel} says ${event.text}`);
+	//	console.log(`Received a message event: user ${event.user} in channel ${event.channel} says ${event.text}`);
 
 	if (event.type === 'message') { //&& !event.bot_id) {
 		// Matched a trigger from a user so playback the story
-		if (triggerKeys.indexOf(event.text) >= 0) {
-			storyBotTools.playbackScript(scriptConfig.config, event);
+		//		if (triggerKeys.toLowerCase().indexOf(event.text.toLowerCase()) >= 0) {
+		console.log('<DEBUG CASE> calling indexOfIgnoreCase with array=',triggerKeys,'and string',event.text);
+		let indexMatch = indexOfIgnoreCase(triggerKeys, event.text);
+	//	console.log('<DEBUG CASE CONFIG with index',indexMatch, 'in the config is',scriptConfig.config[triggerKeys[indexMatch]]);
+		if (indexMatch >= 0) {
+			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, event);
 		}
 	}
 });
 
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event) => {
-//	console.log('INCOMING REACTION EVENT: ',event);
+	//	console.log('INCOMING REACTION EVENT: ',event);
 	// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
 	if (event.reaction === 'skull') {
 		storyBotTools.deleteItem(event.item.channel, event.item.ts);
@@ -194,7 +198,7 @@ slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanu
 slackInteractions.action(/callback_/, (payload, respond) => {
 
 	if (callbackData.indexOf(payload.callback_id) >= 0) {
-//		console.log('<Callback> DEBUG: matched callback for with ', payload.callback_id);
+		//		console.log('<Callback> DEBUG: matched callback for with ', payload.callback_id);
 		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
 	} else {
 		console.log('<Callback> No match in the config for', payload.callback_id);
@@ -279,3 +283,52 @@ http.createServer(app).listen(port, () => {
 	storyBotTools.validateBotConnection();
 
 });
+
+
+// Borrowed code to do case-insensitive Array.indexOf
+/**
+ * Test for String equality ignoring case.
+ * @param {String} str1
+ * @param {String} str2
+ * @returns {Boolean} true if both string is equals ignoring case.
+ */
+function equalsIgnoreCase(str1, str2) {
+	return str1.toLowerCase() === str2.toLowerCase();
+}
+
+/**
+ * Find the index of a string in an array of string.
+ * @param {Array} array
+ * @param {String} element
+ * @returns {Number} the index of the element in the array or -1 if not found.
+ */
+function indexOfIgnoreCase(array, element) {
+	var ret = -1;
+	array.some(function(ele, index, array) {
+		if (equalsIgnoreCase(element, ele)) {
+			ret = index;
+			return true;
+		}
+	});
+	return ret;
+}
+
+/**
+ * Test the existence of a string in an array of string.
+ * @param {Array} array
+ * @param {String} element
+ * @returns {Boolean} true if found and false if not found.
+ */
+function existsIgnoreCase(array, element) {
+	return -1 !== indexOfIgnoreCase(array, element);
+}
+
+//convenience method
+Array.prototype.indexOfIgnoreCase = function(input) {
+	return indexOfIgnoreCase(this, input);
+};
+
+//convenience method
+Array.prototype.existsIgnoreCase = function(input) {
+	return -1 !== this.indexOfIgnoreCase(input);
+}
