@@ -68,7 +68,7 @@ const storyBotTools = require('./storytools.js');
 slackEvents.on('message', (event) => {
 	//	console.log(`Received a message event: user ${event.user} in channel ${event.channel} says ${event.text}`);
 
-	if (event.type === 'message') { //&& !event.bot_id) {
+	if (event.type === 'message' && !event.subtype) { //&& !event.bot_id) {
 		// Matched a trigger from a user so playback the story
 		//		if (triggerKeys.toLowerCase().indexOf(event.text.toLowerCase()) >= 0) {
 //		console.log('<DEBUG CASE> calling indexOfIgnoreCase with array=',triggerKeys,'and string',event.text);
@@ -94,7 +94,8 @@ slackEvents.on('reaction_added', (event) => {
 			let reaction_event = {
 				channel: event.item.channel,
 				ts: event.item.ts,
-				text: ':' + event.reaction + ':'
+				text: ':' + event.reaction + ':',
+				reaction: event.reaction
 			};
 
 			storyBotTools.playbackScript(scriptConfig.config[reaction_event.text], scriptConfig.config.Tokens, reaction_event);

@@ -28,11 +28,19 @@ var botID;
 
 
 exports.playbackScript = (config, tokens, event) => {
-//	console.log('<DEBUG> the event is', event);
-//console.log('<DEBUG> and the config passed in is',config);
+	//	console.log('<DEBUG> the event is', event);
+	//console.log('<DEBUG> and the config passed in is',config);
 	const trigger_term = event.text + "-" + event.ts;
+	if (event.reaction) {
+		addHistory(trigger_term, {
+			item: -1,
+			type: 'reaction_trigger',
+			channel: event.channel,
+			ts: event.ts,
+			reaction: event.reaction
+		});
+	} else if (!config[0].delete_trigger && !(config[0].type == 'reply' && config[0].target_item === 'trigger')) {
 
-	if (!config[0].delete_trigger) {
 		// Make it easy to cleanup the trigger term
 		addHistory(trigger_term, {
 			item: -1,
@@ -40,6 +48,7 @@ exports.playbackScript = (config, tokens, event) => {
 			channel: event.channel,
 			ts: event.ts
 		});
+
 	}
 
 	// Step through the script in order
@@ -172,7 +181,9 @@ exports.playbackScript = (config, tokens, event) => {
 										attachments: action.attachments
 									})
 									.then((res) => {
-										//			console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res.ok);
+											//		console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res);
+
+
 										//Add what just happened to the history
 										addHistory(trigger_term, {
 											item: action.item,
@@ -535,7 +546,20 @@ const deleteHistoryItem = (term) => {
 					.catch((err) => {
 						console.error('<Error><deleteHistoryItem><users.profile.set>', err);
 					});
-			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral') && !(message_history[term][i].type === 'trigger')) {
+			} else if (message_history[term][i].type === 'reaction_trigger') {
+				console.log('YO DELETE A REACTION TRIGGER!',message_history[term][i]);
+				webClientBot.reactions.remove({
+						name: message_history[term][i].reaction,
+						channel: message_history[term][i].channel,
+						ts: message_history[term][i].ts
+					}).then((res) => {
+						//				console.log('<DEBUG> just deleted a history item res is', res);
+					})
+					.catch((err) => {
+						console.error('<Error><deleteHistoryItem><reactions.remove> for term', term,'with i=',i,'and item is ',message_history[term][i],'\nError is', err);
+					});
+
+			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
 				webClientBot.chat.delete({
 						channel: message_history[term][i].channel,
 						ts: message_history[term][i].ts
