@@ -147,7 +147,12 @@ exports.playbackScript = (config, tokens, event) => {
 							if (action.target_ts && action.target_channel) {
 								target_ts = action.target_ts;
 								target_channel = action.target_channel;
+							} else if (action.target_item.indexOf('thread') >= 0 && action.type === 'reaction') {
+								// reaction to the thread parent, not the triggering message
+								target_ts = event.thread_ts;
+								target_channel = event.channel;
 							} else if (action.target_item.indexOf('trigger') >= 0) {
+								//reply in the thread, not back in the channel
 								if (action.type === 'reply' && event.thread_ts) {
 									target_ts = event.thread_ts;
 								} else {
@@ -181,7 +186,7 @@ exports.playbackScript = (config, tokens, event) => {
 										attachments: action.attachments
 									})
 									.then((res) => {
-											//		console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res);
+										//		console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res);
 
 
 										//Add what just happened to the history
@@ -253,7 +258,7 @@ exports.playbackScript = (config, tokens, event) => {
 										timestamp: target_ts
 									})
 									.then((res) => {
-										//		console.log('<DEBUG> API call for reactions.add with params', params, 'had response', res.ok);
+										//	console.log('<DEBUG> API call for reactions.add with params', params, 'had response', res.ok);
 										//Add what just happened to the history
 										addHistory(trigger_term, {
 											item: action.item,
@@ -547,7 +552,7 @@ const deleteHistoryItem = (term) => {
 						console.error('<Error><deleteHistoryItem><users.profile.set>', err);
 					});
 			} else if (message_history[term][i].type === 'reaction_trigger') {
-				console.log('YO DELETE A REACTION TRIGGER!',message_history[term][i]);
+				console.log('YO DELETE A REACTION TRIGGER!', message_history[term][i]);
 				webClientBot.reactions.remove({
 						name: message_history[term][i].reaction,
 						channel: message_history[term][i].channel,
@@ -556,7 +561,7 @@ const deleteHistoryItem = (term) => {
 						//				console.log('<DEBUG> just deleted a history item res is', res);
 					})
 					.catch((err) => {
-						console.error('<Error><deleteHistoryItem><reactions.remove> for term', term,'with i=',i,'and item is ',message_history[term][i],'\nError is', err);
+						console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and item is ', message_history[term][i], '\nError is', err);
 					});
 
 			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
