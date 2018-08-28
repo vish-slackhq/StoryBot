@@ -97,7 +97,7 @@ slackEvents.on('reaction_added', (event) => {
 				text: ':' + event.reaction + ':'
 			};
 
-			storyBotTools.playbackScript(scriptConfig.config, reaction_event);
+			storyBotTools.playbackScript(scriptConfig.config[reaction_event.text], scriptConfig.config.Tokens, reaction_event);
 		}
 	}
 });

@@ -139,7 +139,7 @@ exports.playbackScript = (config, tokens, event) => {
 								target_ts = action.target_ts;
 								target_channel = action.target_channel;
 							} else if (action.target_item.indexOf('trigger') >= 0) {
-								if (action.type === 'reply') {
+								if (action.type === 'reply' && event.thread_ts) {
 									target_ts = event.thread_ts;
 								} else {
 									target_ts = event.ts;
