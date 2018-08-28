@@ -521,7 +521,8 @@ const getHistory = () => {
 }
 
 // Delete something from the history
-const deleteHistoryItem = (term) => {
+const deleteHistoryItem = (inputTerm) => {
+	let term = unescape(inputTerm);
 	if (!message_history[term]) {
 		console.log('<History> Well this is embarassing:' + term + "doesn't exist in history");
 		return 'Well this is embarassing: ' + term + " doesn't exist in history";
