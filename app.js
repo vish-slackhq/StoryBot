@@ -69,7 +69,7 @@ slackEvents.on('message', (event) => {
 	//	console.log(`Received a message event: user ${event.user} in channel ${event.channel} says ${event.text}`);
 	//	console.log('INCOMING MESSAGE EVENT: ',event);
 
-	if (event.type === 'message' && !event.subtype) { //&& !event.bot_id) {
+	if (event.type === 'message' && (!event.subtype || event.subtype === 'bot_message')) { //&& !event.bot_id) {
 		// Matched a trigger from a user so playback the story
 		//		if (triggerKeys.toLowerCase().indexOf(event.text.toLowerCase()) >= 0) {
 //		console.log('<DEBUG CASE> calling indexOfIgnoreCase with array=',triggerKeys,'and string',event.text);
