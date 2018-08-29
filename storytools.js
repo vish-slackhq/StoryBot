@@ -107,9 +107,13 @@ exports.playbackScript = (config, tokens, event) => {
 										callback();
 									}).catch((err) => {
 										console.error('<Error><Main Loop><addHistory>', err);
+										callback();
+
 									});
 								}).catch((err) => {
 									console.error('<Error><Main Loop><reactions.add>', err);
+									callback();
+
 								});
 						} else {
 							webClientBot.chat.postMessage({
@@ -135,9 +139,13 @@ exports.playbackScript = (config, tokens, event) => {
 									callback();
 								}).catch((err) => {
 									console.error('<Error><Main Loop><addHistory>', err);
+									callback();
+
 								});
 							}).catch((err) => {
 								console.error('<Error><Main Loop><chat.postMessage>', err);
+								callback();
+
 							});
 						}
 					} else {
@@ -200,10 +208,14 @@ exports.playbackScript = (config, tokens, event) => {
 											callback();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><chat.postMessage>', err);
+										callback();
+
 									});
 									break;
 								}
@@ -240,10 +252,14 @@ exports.playbackScript = (config, tokens, event) => {
 											callback();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><chat.postMessage>', err);
+										callback();
+
 									});
 									break;
 								}
@@ -270,10 +286,14 @@ exports.playbackScript = (config, tokens, event) => {
 											callback();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><reactions.add>', err);
+										callback();
+
 									});
 									break;
 								}
@@ -299,10 +319,14 @@ exports.playbackScript = (config, tokens, event) => {
 											callback();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><chat.postEphemeral>', err);
+										callback();
+
 									});
 									break;
 								}
@@ -318,7 +342,11 @@ exports.playbackScript = (config, tokens, event) => {
 										thread_ts: target_ts
 									})
 									.then((res) => {
-										//		console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
+										console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
+
+
+										let fileChannel = res.file.channels[0];
+										let fileShareTs = res.file.shares.public[fileChannel][0].ts;
 										//Add what just happened to the history
 										addHistory(trigger_term, {
 											item: action.item,
@@ -326,14 +354,29 @@ exports.playbackScript = (config, tokens, event) => {
 											channel: res.file.channels[0],
 											ts: res.file.id
 										}).then((res) => {
+
+											//Add what just happened to the history
+											addHistory(trigger_term, {
+												item: -1 * action.item,
+												type: 'message',
+												channel: fileChannel,
+												ts: fileShareTs
+											}).catch((err) => {
+												console.error('<Error><Main Loop><addHistory>', err);
+												callback();
+											});
 											//Allow the async series to go forward
 											callback();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><files.upload>', err);
+										callback();
+
 									});
 									break;
 								}
@@ -361,10 +404,14 @@ exports.playbackScript = (config, tokens, event) => {
 											callback();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><users.profile.set>', err);
+										callback();
+
 									});
 									break;
 								}
@@ -406,6 +453,8 @@ exports.playbackScript = (config, tokens, event) => {
 										});
 									}).catch((err) => {
 										console.error('API call for ', apiMethod, 'resulted in: ', err);
+										callback();
+
 									});
 
 									break;
@@ -443,6 +492,8 @@ exports.playbackScript = (config, tokens, event) => {
 												callback();
 											}).catch((err) => {
 												console.error('<Error><Main Loop><addHistory>', err);
+												callback();
+
 											});
 
 										}).catch(console.error);
@@ -473,10 +524,14 @@ exports.playbackScript = (config, tokens, event) => {
 											callback();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><channels.invite>', err);
+										callback();
+
 									});
 
 									break;
