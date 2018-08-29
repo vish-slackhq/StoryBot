@@ -250,12 +250,12 @@ app.post('/slack/commands', function(req, res) {
 			req.headers['x-slack-request-timestamp'].toString());
 	*/
 	const {
-		token,
+	//	token,
 		command
 	} = req.body;
 
 	console.log('<Slash Command> Received command', command);
-	if (token === process.env.SLACK_VERIFICATION_TOKEN) {
+//	if (token === process.env.SLACK_VERIFICATION_TOKEN) {
 		// respond immediately!
 		res.status(200).end();
 
@@ -264,11 +264,11 @@ app.post('/slack/commands', function(req, res) {
 		} else {
 			console.error('<Slash Command> No matching command');
 		}
-	} else {
+/*	} else {
 		console.error('<Slash Command> Invalid Verification token. Received:', token, 'but wanted', process.env.SLACK_VERIFICATION_TOKEN);
 		//Bad token
 		res.sendStatus(500);
-	}
+	}*/
 });
 
 app.get('/', (req, res) => {
