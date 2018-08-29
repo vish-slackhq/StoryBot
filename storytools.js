@@ -342,7 +342,7 @@ exports.playbackScript = (config, tokens, event) => {
 										thread_ts: target_ts
 									})
 									.then((res) => {
-									//	console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
+										//	console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
 
 
 										let fileChannel = res.file.channels[0];
@@ -576,8 +576,7 @@ const getHistory = () => {
 }
 
 // Delete something from the history
-const deleteHistoryItem = (inputTerm) => {
-	let term = unescape(inputTerm);
+const deleteHistoryItem = (term) => {
 	if (!message_history[term]) {
 		console.log('<History> Well this is embarassing:' + term + "doesn't exist in history");
 		return 'Well this is embarassing: ' + term + " doesn't exist in history";
@@ -614,10 +613,10 @@ const deleteHistoryItem = (inputTerm) => {
 						channel: message_history[term][i].channel,
 						timestamp: message_history[term][i].ts
 					}).then((res) => {
-									//	console.log('<DEBUG> just deleted a history item res is', res);
+						//	console.log('<DEBUG> just deleted a history item res is', res);
 					})
 					.catch((err) => {
-					//	console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
+						//	console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
 					});
 
 			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
@@ -962,6 +961,7 @@ exports.adminCallback = (payload, respond) => {
 }
 
 exports.historyCleanup = (payload, respond) => {
+
 	let msg = deleteHistoryItem(payload.actions[0].value);
 
 	response = {
