@@ -608,7 +608,7 @@ const deleteHistoryItem = (term) => {
 						console.error('<Error><deleteHistoryItem><users.profile.set>', err);
 					});
 			} else if (message_history[term][i].type === 'invite') {
-				console.log('YO Kick someone!', message_history[term][i]);
+			//	console.log('YO Kick someone!', message_history[term][i]);
 				webClientBot.channels.kick({
 						channel: message_history[term][i].channel,
 						user: message_history[term][i].user
@@ -1028,21 +1028,17 @@ exports.callbackMatch = (payload, respond, callback) => {
 					channel: payload.channel.id
 				}
 				//				console.log('INVITING response', response);
-
 				webClientBot.channels.invite(response).then((res) => {
 						//Add what just happened to the history
-						addHistory('callback-' + callback.name, {
+						addHistory('callback-' + callback.callback_name, {
 							item: 0,
 							type: "invite",
 							channel: res.channel.id,
 							user: userId
 						}).then((res) => {
 							//Allow the async series to go forward
-							callback();
 						}).catch((err) => {
-							console.error('<Error><Main Loop><addHistory>', err);
-							callback();
-
+							console.error('<Error><CallbackMatchInvite><addHistory>', err);
 						});
 					})
 					.catch((err) => {
