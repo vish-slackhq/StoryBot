@@ -506,11 +506,12 @@ exports.playbackScript = (config, tokens, event) => {
 								}
 							case 'invite':
 								{
+									let userId = getUserId(action.text)
 
 									webClientBot.channels.invite({
 										token: tokens.find(o => o.name === action.username).token,
 										channel: getChannelId(action.channel),
-										user: getUserId(action.text)
+										user: userId
 									})
 									.then((res) => {
 										//Add what just happened to the history
@@ -518,7 +519,7 @@ exports.playbackScript = (config, tokens, event) => {
 											item: action.item,
 											type: action.type,
 											channel: res.channel.id,
-											ts: null
+											user: userId
 										}).then((res) => {
 											//Allow the async series to go forward
 											callback();
@@ -606,6 +607,18 @@ const deleteHistoryItem = (term) => {
 					.catch((err) => {
 						console.error('<Error><deleteHistoryItem><users.profile.set>', err);
 					});
+			} else if (message_history[term][i].type === 'invite') {
+				console.log('YO Kick someone!', message_history[term][i]);
+				webClientBot.channels.kick({
+						channel: message_history[term][i].channel,
+						user: message_history[term][i].user
+					}).then((res) => {
+						//	console.log('<DEBUG> just deleted a history item res is', res);
+					})
+					.catch((err) => {
+						//	console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
+					});
+
 			} else if (message_history[term][i].type === 'reaction_trigger') {
 				console.log('YO DELETE A REACTION TRIGGER!', message_history[term][i]);
 				webClientBot.reactions.remove({
@@ -1009,15 +1022,32 @@ exports.callbackMatch = (payload, respond, callback) => {
 		//Delay the item if specified, then execute the rest
 		delay(callback.delay * 1000)
 			.then((res) => {
+				let userId = getUserId(callback.username)
 				response = {
-					user: getUserId(callback.username),
+					user: userId,
 					channel: payload.channel.id
 				}
 				//				console.log('INVITING response', response);
 
-				webClientBot.channels.invite(response).catch((err) => {
-					console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:', err);
-				});;
+				webClientBot.channels.invite(response).then((res) => {
+						//Add what just happened to the history
+						addHistory('callback-' + callback.name, {
+							item: 0,
+							type: "invite",
+							channel: res.channel.id,
+							user: userId
+						}).then((res) => {
+							//Allow the async series to go forward
+							callback();
+						}).catch((err) => {
+							console.error('<Error><Main Loop><addHistory>', err);
+							callback();
+
+						});
+					})
+					.catch((err) => {
+						console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:', err);
+					});;
 			}).catch(console.error);
 
 	}
