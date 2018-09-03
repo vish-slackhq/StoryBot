@@ -71,12 +71,11 @@ slackEvents.on('message', (event) => {
 
 	if (event.type === 'message' && (!event.subtype || event.subtype === 'bot_message')) { //&& !event.bot_id) {
 		// Matched a trigger from a user so playback the story
-		//		if (triggerKeys.toLowerCase().indexOf(event.text.toLowerCase()) >= 0) {
-//		console.log('<DEBUG CASE> calling indexOfIgnoreCase with array=',triggerKeys,'and string',event.text);
+		//	if (triggerKeys.indexOf(event.text) >= 0) {
 		let indexMatch = indexOfIgnoreCase(triggerKeys, event.text);
-	//	console.log('<DEBUG CASE CONFIG with index',indexMatch, 'in the config is',scriptConfig.config[triggerKeys[indexMatch]]);
 		if (indexMatch >= 0) {
 			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, event);
+			//	storyBotTools.playbackScript(scriptConfig.config[event.text], scriptConfig.config.Tokens, event);
 		}
 	}
 });
@@ -250,25 +249,25 @@ app.post('/slack/commands', function(req, res) {
 			req.headers['x-slack-request-timestamp'].toString());
 	*/
 	const {
-	//	token,
+		//	token,
 		command
 	} = req.body;
 
 	console.log('<Slash Command> Received command', command);
-//	if (token === process.env.SLACK_VERIFICATION_TOKEN) {
-		// respond immediately!
-		res.status(200).end();
+	//	if (token === process.env.SLACK_VERIFICATION_TOKEN) {
+	// respond immediately!
+	res.status(200).end();
 
-		if (req.body.command === '/storybot') {
-			storyBotTools.adminMenu(req.body);
-		} else {
-			console.error('<Slash Command> No matching command');
-		}
-/*	} else {
-		console.error('<Slash Command> Invalid Verification token. Received:', token, 'but wanted', process.env.SLACK_VERIFICATION_TOKEN);
-		//Bad token
-		res.sendStatus(500);
-	}*/
+	if (req.body.command === '/storybot') {
+		storyBotTools.adminMenu(req.body);
+	} else {
+		console.error('<Slash Command> No matching command');
+	}
+	/*	} else {
+			console.error('<Slash Command> Invalid Verification token. Received:', token, 'but wanted', process.env.SLACK_VERIFICATION_TOKEN);
+			//Bad token
+			res.sendStatus(500);
+		}*/
 });
 
 app.get('/', (req, res) => {

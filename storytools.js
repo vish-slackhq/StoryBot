@@ -620,7 +620,7 @@ const deleteHistoryItem = (term) => {
 					});
 
 			} else if (message_history[term][i].type === 'reaction_trigger') {
-				console.log('YO DELETE A REACTION TRIGGER!', message_history[term][i]);
+				// console.log('YO DELETE A REACTION TRIGGER!', message_history[term][i]);
 				webClientBot.reactions.remove({
 						name: message_history[term][i].reaction,
 						channel: message_history[term][i].channel,
