@@ -616,7 +616,7 @@ const deleteHistoryItem = (term) => {
 						//	console.log('<DEBUG> just deleted a history item res is', res);
 					})
 					.catch((err) => {
-						//	console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
+							console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
 					});
 
 			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
