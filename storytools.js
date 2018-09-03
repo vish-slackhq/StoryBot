@@ -1027,7 +1027,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 					user: userId,
 					channel: payload.channel.id
 				}
-				//				console.log('INVITING response', response);
+								console.log('INVITING response', response);
 				webClientBot.channels.invite(response).then((res) => {
 						//Add what just happened to the history
 						addHistory('callback-' + callback.callback_name, {
@@ -1037,6 +1037,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 							user: userId
 						}).then((res) => {
 							//Allow the async series to go forward
+							console.log('<DEBUG><CallBackMatchInvite><addHistory> for',callback.callback_name);
 						}).catch((err) => {
 							console.error('<Error><CallbackMatchInvite><addHistory>', err);
 						});
