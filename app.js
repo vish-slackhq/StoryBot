@@ -18,6 +18,8 @@ require('dotenv').config({
 //Load the appropriate config file from Google Sheets
 var scriptConfig = require('./load-conf-google');
 var triggerKeys = [];
+
+// TODO: Do we still need these or can they be accessed directly from the config object?
 var callbackData = [];
 
 scriptConfig.loadConfig().then((result) => {
@@ -66,15 +68,14 @@ const storyBotTools = require('./storytools.js');
 
 // Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
 slackEvents.on('message', (event) => {
-	//	console.log(`Received a message event: user ${event.user} in channel ${event.channel} says ${event.text}`);
-	//	console.log('INCOMING MESSAGE EVENT: ',event);
+	console.log('INCOMING MESSAGE EVENT: ', event);
 
-	if (event.type === 'message' && !event.subtype) { //&& !event.bot_id) {
+	// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
+	// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
+	if (event.type === 'message' && !event.subtype && !event.bot_id) {
 		// Matched a trigger from a user so playback the story
-		//		if (triggerKeys.toLowerCase().indexOf(event.text.toLowerCase()) >= 0) {
-//		console.log('<DEBUG CASE> calling indexOfIgnoreCase with array=',triggerKeys,'and string',event.text);
 		let indexMatch = indexOfIgnoreCase(triggerKeys, event.text);
-	//	console.log('<DEBUG CASE CONFIG with index',indexMatch, 'in the config is',scriptConfig.config[triggerKeys[indexMatch]]);
+
 		if (indexMatch >= 0) {
 			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, event);
 		}
@@ -119,7 +120,7 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 					let attachments = [];
 					let key_list = ""
 					triggerKeys.forEach(function(key) {
-						if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks')) {
+						if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks' || key === 'Commands')) {
 							key_list = key_list + " \`" + key + "\`";
 						}
 					});
@@ -133,7 +134,6 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 						mrkdwn_in: ['text', 'fields']
 					});
 
-					//		console.log('<DEBUG><Admin Menu> Triggers response is', attachments);
 					respond({
 						response_type: 'ephemeral',
 						replace_original: true,
@@ -156,7 +156,14 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 							callbackData.push(callback.callback_name);
 						});
 					}
-					console.log('<Re-Loading> Loaded config for keys:', triggerKeys, 'and Callbacks are:', callbackData);
+
+					// If we're specifying dynamic callbacks in this config
+					if (result.Commands) {
+						result.Commands.forEach(function(command) {
+							commandData.push(command.command_name);
+						});
+					}
+					console.log('<Loading> Loaded config for keys:', triggerKeys, 'and Callbacks are:', callbackData, 'and Commands are:', commandData);
 
 					console.log('<Re-Loading>re-validating Bot Connection / building channel list');
 					storyBotTools.validateBotConnection();
@@ -198,14 +205,11 @@ slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanu
 
 
 slackInteractions.action(/callback_/, (payload, respond) => {
-
 	if (callbackData.indexOf(payload.callback_id) >= 0) {
-		//		console.log('<Callback> DEBUG: matched callback for with ', payload.callback_id);
 		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
 	} else {
 		console.log('<Callback> No match in the config for', payload.callback_id);
 	}
-
 });
 
 
@@ -232,8 +236,6 @@ app.post('/slack/commands', function(req, res) {
 	JSON.stringify(hmac.update(baseString));
 	const mySignature = `v0=${hmac.digest(`hex`)}`;
 
-	//console.log('My signature I generated is', mySignature);
-
 	if (mySignature == slashSig) {
 		console.log(`Success
         Signature: ${mySignature}`);
@@ -243,32 +245,30 @@ app.post('/slack/commands', function(req, res) {
          Actual: ${slashSig}`);
 	}
 
-	/*
-		verifyRequestSignature(
-			process.env.SLACK_SIGNING_SECRET,
-			req.headers['x-slack-signature'].toString(),
-			req.headers['x-slack-request-timestamp'].toString());
-	*/
-	const {
-	//	token,
-		command
-	} = req.body;
 
-	console.log('<Slash Command> Received command', command);
-//	if (token === process.env.SLACK_VERIFICATION_TOKEN) {
-		// respond immediately!
-		res.status(200).end();
+	let command = req.body.command;
+	let args = req.body.text;
 
-		if (req.body.command === '/storybot') {
-			storyBotTools.adminMenu(req.body);
+	console.log('<Slash Command> Received command', command, 'with overall info', req.body);
+	// respond immediately!
+	res.status(200).end();
+
+	if (command === '/storybot') {
+		storyBotTools.adminMenu(req.body);
+		//	} else if (commandData.indexOf(command) >= 0) {
+	} else {
+		let indexMatch = indexOfIgnoreCase(triggerKeys, command + ' ' + args);
+
+		if (indexMatch >= 0) {
+			let slash_event = {
+				channel: req.body.channel_id,
+				ts: 'slash',
+			};
+			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, slash_event);
 		} else {
 			console.error('<Slash Command> No matching command');
 		}
-/*	} else {
-		console.error('<Slash Command> Invalid Verification token. Received:', token, 'but wanted', process.env.SLACK_VERIFICATION_TOKEN);
-		//Bad token
-		res.sendStatus(500);
-	}*/
+	}
 });
 
 app.get('/', (req, res) => {

@@ -15,7 +15,8 @@ const {
 const {
 	WebClient
 } = require('@slack/client');
-const webClientBot = new WebClient(process.env.SLACK_AUTH_TOKEN);
+const webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
+//const webClientBot = new WebClient(process.env.SLACK_AUTH_TOKEN);
 //const webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
 
 // Global variables - way to not need these?
@@ -23,14 +24,16 @@ var message_history = [];
 var user_list = [];
 var allUserIds = [];
 var channel_list = [];
-//exports.authUserID;
-var botID;
 
 
 exports.playbackScript = (config, tokens, event) => {
 	//	console.log('<DEBUG> the event is', event);
 	//console.log('<DEBUG> and the config passed in is',config);
+
+	// Form the string for unique message_history entry
 	const trigger_term = event.text + "-" + event.ts;
+	
+	// History for a reaction trigger
 	if (event.reaction) {
 		addHistory(trigger_term, {
 			item: -1,
@@ -616,7 +619,7 @@ const deleteHistoryItem = (term) => {
 						//	console.log('<DEBUG> just deleted a history item res is', res);
 					})
 					.catch((err) => {
-							console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
+						console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
 					});
 
 			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
@@ -679,7 +682,6 @@ exports.deleteItem = (channel, ts) => {
 
 // Get the list of all users and their IDs
 const buildUserList = (authBotId) => {
-	botId = authBotId;
 	webClientBot.users.list()
 		.then((res) => {
 			//	console.log('<DEBUG> getUserList users.list resulted in',res);
@@ -690,7 +692,6 @@ const buildUserList = (authBotId) => {
 					allUserIds = allUserIds + "," + user.id;
 				}
 			});
-			//		console.log('<DEBUG> buildUserList final list is', user_list);
 		})
 		.catch((err) => {
 			console.error('<Error><buildUserList><users.list>', err);
@@ -701,9 +702,7 @@ const buildUserList = (authBotId) => {
 const getUserId = (name) => {
 	//remove any spaces in the names from the list
 	name = name.replace(/\s+/g, '');
-	//	console.log('Getting user ID for ', name);
 	let id = user_list.find(o => o.name === name).id;
-	//	console.log('Retrieved id', id, 'for user name', name);
 	return id;
 }
 
@@ -715,7 +714,6 @@ const getChannelList = () => {
 			get_private: true
 		})
 		.then((res) => {
-			//		console.log('DEBUG: channels res:',res);
 			channel_list = res.channels;
 		})
 		.catch((err) => {
@@ -725,20 +723,14 @@ const getChannelList = () => {
 
 // Look up Channel ID from a Name
 const getChannelId = (name) => {
-	//	console.log('<DEBUG><getChannelId> Called for name', name);
-
 	let result = null;
-
 	if (channel_list.find(channel => channel.name === name)) {
 		result = channel_list.find(channel => channel.name === name).id;
 	}
-
-	//	console.log('<DEBUG><getChannelId> Called for name', name, 'with result id', result);
 	return result;
 }
 
 const inviteUsersToChannel = (channelId, userIdList) => {
-	//	console.log('<Debug><inviteUsersToChannel> Inviting users to channel ID', channelId, 'now for userIds', userIdList);
 	webClientBot.channels.invite({
 		channel: channelId,
 		users: userIdList
@@ -804,7 +796,7 @@ exports.validateBotConnection = () => {
 	webClientBot.auth.test()
 		.then((res) => {
 
-			//	console.log('<DEBUG>auth result is',res);
+			console.log('<DEBUG>auth result is', res);
 			const {
 				team,
 				user_id
@@ -1052,25 +1044,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 			webClientBot.chat.postMessage(response).catch((err) => {
 				console.error('<Error><callbackMatch><chat.postMessage>', err);
 			});;
-			/*
-						webClientBot.chat.postMessage(response)
-							.then((res) => {
-								//			console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res.ok);
-								//Add what just happened to the history
-								addHistory(trigger_term, {
-										item: action.item,
-										type: action.type,
-										channel: res.channel,
-										ts: res.ts
-									}).then((res) => {
-										//Allow the async series to go forward
-										callback();
-									})
-									.catch(console.error);
-							})
-							.catch(console.error);*/
 		}
 	}
 
-	//return {text: "yoyoyoy"};
 }
