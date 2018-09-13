@@ -5,7 +5,6 @@ const async = require("async");
 const qs = require('querystring');
 const axios = require('axios');
 
-
 // Webhooks for slash command response
 const {
 	IncomingWebhook
@@ -15,25 +14,25 @@ const {
 const {
 	WebClient
 } = require('@slack/client');
-const webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
-//const webClientBot = new WebClient(process.env.SLACK_AUTH_TOKEN);
-//const webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
+
+// TODO: figure out this whole token mess
+// const webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
+const webClientBot = new WebClient(process.env.SLACK_AUTH_TOKEN);
 
 // Global variables - way to not need these?
-var message_history = [];
-var user_list = [];
-var allUserIds = [];
-var channel_list = [];
+var message_history = []; // maintains the running session history, used for deletes and reply/reaction targets
+var user_list = []; // cached user list for quicker lookups
+var channel_list = []; // cached channel list for quicker lookups
+//var allUserIds = [];
 
-
+// The main function that plays back a given trigger once it's matched
+// Takes the config for the specific trigger we are playing back, list of user tokens, and event data
 exports.playbackScript = (config, tokens, event) => {
-	//	console.log('<DEBUG> the event is', event);
-	//console.log('<DEBUG> and the config passed in is',config);
-
 	// Form the string for unique message_history entry
 	const trigger_term = event.text + "-" + event.ts;
-	
-	// History for a reaction trigger
+	console.log('<DEBUG><playbackScript> Starting playback for', trigger_term);
+
+	// Add history for a reaction trigger
 	if (event.reaction) {
 		addHistory(trigger_term, {
 			item: -1,
@@ -42,6 +41,7 @@ exports.playbackScript = (config, tokens, event) => {
 			ts: event.ts,
 			reaction: event.reaction
 		});
+		// TODO - what is this doing, are we sure we want to delete the triggering item in these cases?
 	} else if (!config[0].delete_trigger && !(config[0].type == 'reply' && config[0].target_item === 'trigger')) {
 
 		// Make it easy to cleanup the trigger term
@@ -51,18 +51,16 @@ exports.playbackScript = (config, tokens, event) => {
 			channel: event.channel,
 			ts: event.ts
 		});
-
 	}
 
-	// Step through the script in order
+	// Step through the trigger's script in the specified order
 	async.eachSeries(config, function(action, callback) {
 
 		// Ignore blank lines that may have been ingested for some reason 
 		if (action.type) {
+
 			//Clean up a fake slash command or other item that has `delete_trigger` set
 			if (action.delete_trigger) {
-
-				//	console.log('<DEBUG> Need to delete the trigger message');
 				webClientBot.chat.delete({
 					channel: event.channel,
 					ts: event.ts
@@ -71,25 +69,388 @@ exports.playbackScript = (config, tokens, event) => {
 				});
 			}
 
-			//Delay the item if specified, then execute the rest
+			//Delay an item for specified number of seconds, then execute it
 			delay(action.delay * 1000)
 				.then((res) => {
-					let apiMethod, token, as_user, target_ts, target_channel, params;
+					let apiMethod, target_ts, target_channel, params;
 
-					// Set targets for the actions that need them
+					// As long as we aren't in prototype mode, this is the real stuff
+					if (!(action.type === 'botuser')) {
 
-					// All of this botuser stuff enables quick protyping without tokens
-					if (action.type === 'botuser') {
-						if (action.target_item) {
-							if (action.target_item.indexOf('trigger') >= 0) {
-								target_ts = event.ts;
+						// Set targets for the actions that need them - reply, reaction, share, and files in a thread
+						if (action.type === 'reply' || action.type === 'reaction' || action.type === 'share' || ((action.type === 'file') && action.target_item)) {
+							// If these are manually specified, set them directly (used for sharing existing messages)
+							if (action.target_ts && action.target_channel) {
+								target_ts = action.target_ts;
+								target_channel = action.target_channel;
+							} else if (action.target_item.indexOf('thread') >= 0 && action.type === 'reaction') {
+								// If trigger = `thread`, reaction is to the thread parent, not the triggering message
+								target_ts = event.thread_ts;
+								target_channel = event.channel;
+							} else if (action.target_item.indexOf('trigger') >= 0) {
+								// Respond in a thread to the triggering event and not the channel
+								if ((action.type === 'file' || action.type === 'reply') && event.thread_ts) {
+									target_ts = event.thread_ts;
+								} else {
+									target_ts = event.ts;
+								}
 								target_channel = event.channel;
 							} else {
+								// Otherwise just set the targets by looking them up in the existing message_history
 								target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
 								target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
 							}
 						}
 
+						// Take action on the item by type
+						switch (action.type) {
+							case 'message':
+							case 'reply':
+								{
+									webClientBot.chat.postMessage({
+										token: tokens.find(o => o.name === action.username).token, //look up the user's token to post on their behalf
+										as_user: true,
+										username: action.username,
+										channel: action.channel,
+										text: action.text,
+										thread_ts: target_ts,
+										link_names: true,
+										unfurl_links: true,
+										attachments: action.attachments
+									})
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postMessage>', err);
+										callback();
+									});
+									break;
+								}
+							case 'bot':
+							case 'botdm':
+								{
+									params = {
+										as_user: false,
+										username: action.username,
+										channel: action.channel,
+										text: action.text,
+										link_names: true,
+										unfurl_links: true,
+										icon_emoji: action.icon_emoji,
+										icon_url: action.icon_url,
+										attachments: action.attachments
+									};
+
+									// Bot messages can be sent to current channel for fake /commands
+									if (action.channel === 'current') {
+										params.channel = event.channel;
+									}
+
+									webClientBot.chat.postMessage(params)
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postMessage>', err);
+										callback();
+									});
+									break;
+								}
+							case 'reaction':
+								{
+									webClientBot.reactions.add({
+										token: tokens.find(o => o.name === action.username).token,
+										as_user: true,
+										username: action.username,
+										channel: target_channel,
+										name: action.reaction,
+										timestamp: target_ts
+									})
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><reactions.add>', err);
+										callback();
+									});
+									break;
+								}
+							case 'ephemeral':
+								{
+									webClientBot.chat.postEphemeral({
+										user: event.user,
+										channel: event.channel,
+										as_user: false,
+										link_names: true,
+										attachments: action.attachments
+									})
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.message_ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postEphemeral>', err);
+										callback();
+									});
+									break;
+								}
+							case 'file':
+								{
+									webClientBot.files.upload({
+										token: tokens.find(o => o.name === action.username).token,
+										channels: action.channel,
+										filetype: action.filetype,
+										title: action.title,
+										initial_comment: action.text,
+										content: action.content,
+										thread_ts: target_ts
+									})
+									.then((res) => {
+										// Assuming we are using the first time the file has been shared
+										let fileChannel = res.file.channels[0];
+										let fileShareTS = res.file.shares.public[fileChannel][0].ts;
+										//Add what just happened to the history - File
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.file.channels[0],
+											ts: res.file.id
+										}).then((res) => {
+											//Add what just happened to the history - message that referenced the file
+											addHistory(trigger_term, {
+												item: -1 * action.item,
+												type: 'message',
+												channel: fileChannel,
+												ts: fileShareTS
+											}).catch((err) => {
+												console.error('<Error><Main Loop><addHistory>', err);
+												callback();
+											});
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><files.upload>', err);
+										callback();
+									});
+									break;
+								}
+							case 'status':
+								{
+									webClientBot.users.profile.set({
+										token: tokens.find(o => o.name === action.username).token,
+										profile: {
+											"status_text": action.text,
+											"status_emoji": action.reaction
+										}
+									})
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											username: res.username,
+											ts: res.message_ts // TODO - is this legit?
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><users.profile.set>', err);
+										callback();
+									});
+									break;
+								}
+							case 'share':
+								{
+									// Private API method to share a message, needs to be called manually
+									apiMethod = 'chat.shareMessage';
+
+									params = {
+										token: tokens.find(o => o.name === action.username).token,
+										text: action.text,
+										share_channel: action.channel,
+										channel: target_channel,
+										timestamp: target_ts,
+										link_names: true,
+										unfurl_links: true
+									}
+
+									//Make the call
+									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
+									.then((result) => {
+										let ts = result.data.ts;
+										if (action.type === 'post') {
+											ts = result.data.file.id;
+										}
+
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: result.data.channel,
+											ts: ts
+										}).then((result) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+										});
+									}).catch((err) => {
+										console.error('API call for ', apiMethod, 'resulted in: ', err);
+										callback();
+									});
+									break;
+								}
+							case 'sharefile':
+								{
+									// Private API method to share a file, needs to be called manually
+									apiMethod = 'files.share';
+									let sharefileChannelId = getChannelId(action.channel);
+
+									params = {
+										token: tokens.find(o => o.name === action.username).token,
+										comment: action.text,
+										channel: sharefileChannelId,
+										file: action.target_item
+									}
+
+									//Make the call
+									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
+									.then((result) => {
+										// Need to get back some additional information to account for File Threads
+										webClientBot.files.info({
+											file: action.target_item
+										}).then((res) => {
+											//Add what just happened to the history
+											addHistory(trigger_term, {
+												item: action.item,
+												type: 'message',
+												channel: sharefileChannelId,
+												ts: res.file.shares.public[sharefileChannelId][0].ts
+											}).then((result) => {
+												//Allow the async series to go forward
+												callback();
+											}).catch((err) => {
+												console.error('<Error><Main Loop><addHistory>', err);
+												callback();
+											});
+										}).catch((err) => {
+											console.error('<Error><Main Loop><ShareFile><files.info>', err);
+											callback();
+										});
+									}).catch((err) => {
+										console.error('API call for ', apiMethod, 'resulted in: ', err);
+										callback();
+									});
+									break;
+								}
+							case 'invite':
+								{
+									let userId = getUserId(action.text)
+									webClientBot.channels.invite({
+										token: tokens.find(o => o.name === action.username).token,
+										channel: getChannelId(action.channel),
+										user: userId
+									})
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel.id,
+											user: userId
+										}).then((res) => {
+											//Allow the async series to go forward
+											callback();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											callback();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><channels.invite>', err);
+										callback();
+									});
+									break;
+								}
+							default:
+								console.log('Nothing matched to the action type?');
+								callback();
+								break;
+						}
+						// All of this botuser stuff enables quick protyping without tokens
+					} else {
+						// Is this something that has a target - i.e. a reaction or reply? Set up the targets
+						if (action.target_item) {
+							// Is the target the message/reaction that triggered this?
+							if (action.target_item.indexOf('trigger') >= 0) {
+								target_ts = event.ts;
+								target_channel = event.channel;
+								// Otherwise look up the referenced trigger item in the existing message_history
+							} else {
+								target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
+								target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
+							}
+						}
+						// Prototype reaction
 						if (action.reaction) {
 							webClientBot.reactions.add({
 									as_user: false,
@@ -109,15 +470,14 @@ exports.playbackScript = (config, tokens, event) => {
 										//Allow the async series to go forward
 										callback();
 									}).catch((err) => {
-										console.error('<Error><Main Loop><addHistory>', err);
+										console.error('<Error><Main Loop><Prototype addHistory>', err);
 										callback();
-
 									});
 								}).catch((err) => {
-									console.error('<Error><Main Loop><reactions.add>', err);
+									console.error('<Error><Main Loop><Prototype reactions.add>', err);
 									callback();
-
 								});
+							// Otherwise this is a message/bot message
 						} else {
 							webClientBot.chat.postMessage({
 								as_user: false,
@@ -143,418 +503,140 @@ exports.playbackScript = (config, tokens, event) => {
 								}).catch((err) => {
 									console.error('<Error><Main Loop><addHistory>', err);
 									callback();
-
 								});
 							}).catch((err) => {
 								console.error('<Error><Main Loop><chat.postMessage>', err);
 								callback();
-
 							});
-						}
-					} else {
-
-						// As long as we aren't in prototype mode, this is the real stuff
-						if (action.type === 'reply' || action.type === 'reaction' || action.type === 'share' || ((action.type === 'file') && action.target_item)) {
-							if (action.target_ts && action.target_channel) {
-								target_ts = action.target_ts;
-								target_channel = action.target_channel;
-							} else if (action.target_item.indexOf('thread') >= 0 && action.type === 'reaction') {
-								// reaction to the thread parent, not the triggering message
-								target_ts = event.thread_ts;
-								target_channel = event.channel;
-							} else if (action.target_item.indexOf('trigger') >= 0) {
-								//reply in the thread, not back in the channel
-								if ((action.type === 'file' || action.type === 'reply') && event.thread_ts) {
-									target_ts = event.thread_ts;
-								} else {
-									target_ts = event.ts;
-								}
-								target_channel = event.channel;
-
-							} else {
-								target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
-								target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
-							}
-						}
-
-						//	console.log('DEBUG: received event with type ',action.type);
-
-
-						// Pull together the paramters for the item
-						switch (action.type) {
-							case 'message':
-							case 'reply':
-								{
-									webClientBot.chat.postMessage({
-										token: tokens.find(o => o.name === action.username).token,
-										as_user: true,
-										username: action.username,
-										channel: action.channel,
-										text: action.text,
-										thread_ts: target_ts,
-										link_names: true,
-										unfurl_links: true,
-										attachments: action.attachments
-									})
-									.then((res) => {
-										//		console.log('<DEBUG> API call for user postMessage with params', params, 'had response', res);
-
-
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
-
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><chat.postMessage>', err);
-										callback();
-
-									});
-									break;
-								}
-							case 'bot':
-							case 'botdm':
-								{
-									params = {
-										as_user: false,
-										username: action.username,
-										channel: action.channel,
-										text: action.text,
-										link_names: true,
-										unfurl_links: true,
-										icon_emoji: action.icon_emoji,
-										icon_url: action.icon_url,
-										attachments: action.attachments
-									};
-
-									if (action.channel === 'current') {
-										params.channel = event.channel;
-									}
-
-									webClientBot.chat.postMessage(params)
-									.then((res) => {
-										//	console.log('<DEBUG> API call for Bot postMessage with params', params, 'had response', res.ok);
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
-
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><chat.postMessage>', err);
-										callback();
-
-									});
-									break;
-								}
-							case 'reaction':
-								{
-									webClientBot.reactions.add({
-										token: tokens.find(o => o.name === action.username).token,
-										as_user: true,
-										username: action.username,
-										channel: target_channel,
-										name: action.reaction,
-										timestamp: target_ts
-									})
-									.then((res) => {
-										//	console.log('<DEBUG> API call for reactions.add with params', params, 'had response', res.ok);
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
-
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><reactions.add>', err);
-										callback();
-
-									});
-									break;
-								}
-							case 'ephemeral':
-								{
-									webClientBot.chat.postEphemeral({
-										user: event.user,
-										channel: event.channel,
-										as_user: false,
-										link_names: true,
-										attachments: action.attachments
-									})
-									.then((res) => {
-										//			console.log('<DEBUG> API call for postEphemeral with params', params, 'had response', res);
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.message_ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
-
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><chat.postEphemeral>', err);
-										callback();
-
-									});
-									break;
-								}
-							case 'file':
-								{
-									webClientBot.files.upload({
-										token: tokens.find(o => o.name === action.username).token,
-										channels: action.channel,
-										filetype: action.filetype,
-										title: action.title,
-										initial_comment: action.text,
-										content: action.content,
-										thread_ts: target_ts
-									})
-									.then((res) => {
-										//	console.log('<DEBUG> API call for files.upload had response', res, 'with shares in chan', res.file.shares.public[res.file.channels[0]]['ts'], 'and ts', res.file.shares.public[res.file.channels[0]].ts);
-
-
-										let fileChannel = res.file.channels[0];
-										let fileShareTs = res.file.shares.public[fileChannel][0].ts;
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.file.channels[0],
-											ts: res.file.id
-										}).then((res) => {
-
-											//Add what just happened to the history
-											addHistory(trigger_term, {
-												item: -1 * action.item,
-												type: 'message',
-												channel: fileChannel,
-												ts: fileShareTs
-											}).catch((err) => {
-												console.error('<Error><Main Loop><addHistory>', err);
-												callback();
-											});
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
-
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><files.upload>', err);
-										callback();
-
-									});
-									break;
-								}
-							case 'status':
-								{
-
-									webClientBot.users.profile.set({
-										//user: getUserId(action.username),
-										token: tokens.find(o => o.name === action.username).token,
-										profile: {
-											"status_text": action.text,
-											"status_emoji": action.reaction
-										}
-									})
-									.then((res) => {
-										//console.log('<DEBUG> API call for users.profile.set had response', res);
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											username: res.username,
-											ts: res.message_ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
-
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><users.profile.set>', err);
-										callback();
-
-									});
-									break;
-								}
-							case 'share':
-								{
-									apiMethod = 'chat.shareMessage';
-
-									params = {
-										token: tokens.find(o => o.name === action.username).token,
-										text: action.text,
-										share_channel: action.channel,
-										channel: target_channel,
-										timestamp: target_ts,
-										link_names: true,
-										unfurl_links: true
-									}
-
-									//Make the call
-									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
-									.then((result) => {
-										let ts = result.data.ts;
-										if (action.type === 'post') {
-											ts = result.data.file.id;
-										}
-
-										//	console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
-
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: result.data.channel,
-											ts: ts
-										}).then((result) => {
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-										});
-									}).catch((err) => {
-										console.error('API call for ', apiMethod, 'resulted in: ', err);
-										callback();
-
-									});
-
-									break;
-								}
-							case 'sharefile':
-								{
-									apiMethod = 'files.share';
-									let sharefileChannelId = getChannelId(action.channel);
-
-									params = {
-										token: tokens.find(o => o.name === action.username).token,
-										comment: action.text,
-										channel: sharefileChannelId,
-										file: action.target_item
-									}
-
-									//Make the call
-									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
-									.then((result) => {
-										//		console.log('API call for ', apiMethod, ' with params ', params, ' resulted in: ', result.data);
-
-										webClientBot.files.info({
-											file: action.target_item
-										}).then((res) => {
-
-											//Add what just happened to the history
-											addHistory(trigger_term, {
-												item: action.item,
-												type: 'message',
-												channel: sharefileChannelId,
-												ts: res.file.shares.public[sharefileChannelId][0].ts
-											}).then((result) => {
-
-												//Allow the async series to go forward
-												callback();
-											}).catch((err) => {
-												console.error('<Error><Main Loop><addHistory>', err);
-												callback();
-
-											});
-
-										}).catch(console.error);
-
-									}).catch((err) => {
-										console.error('API call for ', apiMethod, 'resulted in: ', err);
-									});
-
-									break;
-								}
-							case 'invite':
-								{
-
-									webClientBot.channels.invite({
-										token: tokens.find(o => o.name === action.username).token,
-										channel: getChannelId(action.channel),
-										user: getUserId(action.text)
-									})
-									.then((res) => {
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel.id,
-											ts: null
-										}).then((res) => {
-											//Allow the async series to go forward
-											callback();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
-
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><channels.invite>', err);
-										callback();
-
-									});
-
-									break;
-								}
-							default:
-								console.log('default callback');
-								callback();
-								break;
 						}
 					}
 				})
 				.catch((err) => {
 					console.error('<Error><Delay><Main Loop>', err);
+					callback();
 				});
 		}
 	})
-	//.catch(console.error);
 }
 
+// Process a match from the dynamic callback sheet
+exports.callbackMatch = (payload, respond, callback) => {
+	console.log('<DEBUG><callbackMatch> Starting callback match for', callback.callback_name);
+
+	let response = {
+		text: "default response"
+	};
+
+	//Delay the item if specified, then execute the rest
+	delay(callback.delay * 1000).then((res) => {
+		// Check for some of the options for a Callback - these can be combined together
+
+		// Dialog response to callback is true
+		if (callback.dialog) {
+			response = {
+				trigger_id: payload.trigger_id,
+				dialog: callback.attachments
+			}
+			webClientBot.dialog.open(response).catch((err) => {
+				console.error('<Error><callbackMatch><dialog.open> Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
+			});
+		}
+
+		// Ephemeral response as well
+		if (callback.ephemeral) {
+			webClientBot.chat.postEphemeral({
+				user: payload.user.id,
+				channel: payload.channel.id,
+				as_user: false,
+				link_names: true,
+				attachments: callback.attachments
+			}).catch((err) => {
+				console.error('<Error><callbackMatch><chat.postEphemeral>', err);
+			});
+		}
+
+		// Invite based on an interactive message
+		if (callback.invite) {
+			let userId = getUserId(callback.username)
+			response = {
+				user: userId,
+				channel: payload.channel.id
+			}
+			webClientBot.channels.invite(response)
+				.then((res) => {
+					//Add what just happened to the history
+					addHistory(callback.callback_name, {
+						item: 0,
+						type: "invite",
+						channel: res.channel.id,
+						user: userId
+					}).catch((err) => {
+						console.error('<Error><CallbackMatchInvite><addHistory>', err);
+					});
+				})
+				.catch((err) => {
+					console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:', err);
+				});
+		}
+
+		// If there are additional callback items to process, do them
+		if ((!callback.dialog && !callback.ephemeral && !callback.invite) || (callback.invite && callback.update)) {
+			response = {
+				channel: payload.channel.id,
+				text: callback.text,
+				ts: payload.message_ts,
+				icon_url: callback.icon_url,
+				icon_emoji: callback.icon_emoji,
+				username: callback.username,
+				thread_ts: null,
+				link_names: true,
+				as_user: false,
+				attachments: callback.attachments
+			};
+
+			if (callback.channel != 'current') {
+				response.channel = getChannelId(callback.channel);
+			}
+
+			if (callback.update) {
+				webClientBot.chat.update(response)
+					.then((res) => {
+						//Add what just happened to the history
+						addHistory(callback.callback_name, {
+							item: -10,
+							type: 'callback_postMessage',
+							channel: res.channel,
+							ts: res.ts
+						}).catch((err) => {
+							console.error('<Error><CallbackMatch><addHistory>', err);
+						});
+					}).catch((err) => {
+						console.error('<Error><callbackMatch><chat.update>', err);
+					});
+			} else {
+				webClientBot.chat.postMessage(response)
+					.then((res) => {
+						//Add what just happened to the history
+						addHistory(callback.callback_name, {
+							item: -10,
+							type: 'callback_postMessage',
+							channel: res.channel,
+							ts: res.ts
+						}).catch((err) => {
+							console.error('<Error><CallbackMatch><addHistory>', err);
+						});
+					})
+					.catch((err) => {
+						console.error('<Error><callbackMatch><chat.postMessage>', err);
+					});;
+			}
+		}
+	}).catch(console.error);
+}
+
+//
 // Helper Functions
+//
 
 // Promise delay so we can make time elapse between interactions
 const delay = (time) => {
@@ -573,65 +655,53 @@ const addHistory = (name, data) => {
 	});
 }
 
-// Return History for Admin Callback use
-const getHistory = () => {
-	return message_history;
-}
-
 // Delete something from the history
 const deleteHistoryItem = (term) => {
 	if (!message_history[term]) {
-		console.log('<History> Well this is embarassing:' + term + "doesn't exist in history");
+		console.log('<Error><deleteHistoryItem> Well this is embarassing:' + term + "doesn't exist in history");
+		// Send this back to format an in-Slack message
 		return 'Well this is embarassing: ' + term + " doesn't exist in history";
 	} else {
 		for (let i = message_history[term].length - 1; i >= 0; i--) {
 			if (message_history[term][i].type === 'file') {
 				webClientBot.files.delete({
-						file: message_history[term][i].ts
-					}).then((res) => {
-						//					console.log('<DEBUG> just deleted a history item res is', res);
-					})
-					.catch((err) => {
-						console.error('<Error><deleteHistoryItem><files.delete>', err);
-					});
+					file: message_history[term][i].ts
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><files.delete>', err);
+				});
 			} else if (message_history[term][i].type === 'status') {
 				webClientBot.users.profile.set({
-						//	token: config['Tokens'].find(o => o.name === message_history[term][i].username).token,
-						user: getUserId(message_history[term][i].username),
-						profile: {
-							"status_text": "",
-							"status_emoji": ""
-						}
-					})
-					.then((res) => {
-						//			console.log('<DEBUG> just deleted a history item res is', res);
-					})
-					.catch((err) => {
-						console.error('<Error><deleteHistoryItem><users.profile.set>', err);
-					});
+					user: getUserId(message_history[term][i].username),
+					profile: {
+						"status_text": "",
+						"status_emoji": ""
+					}
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><users.profile.set>', err);
+				});
+			} else if (message_history[term][i].type === 'invite') {
+				webClientBot.channels.kick({
+					channel: message_history[term][i].channel,
+					user: message_history[term][i].user
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><channels.kick>', err);
+				});
 			} else if (message_history[term][i].type === 'reaction_trigger') {
-				console.log('YO DELETE A REACTION TRIGGER!', message_history[term][i]);
+				console.log('<DEBUG><reaction trigger history delete> name:',message_history[term][i].reaction,'channel:',message_history[term][i].channel,'timestamp:',message_history[term][i].ts);
 				webClientBot.reactions.remove({
-						name: message_history[term][i].reaction,
-						channel: message_history[term][i].channel,
-						timestamp: message_history[term][i].ts
-					}).then((res) => {
-						//	console.log('<DEBUG> just deleted a history item res is', res);
-					})
-					.catch((err) => {
-						console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
-					});
-
+					name: message_history[term][i].reaction,
+					channel: message_history[term][i].channel,
+					timestamp: message_history[term][i].ts
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
+				});
 			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
 				webClientBot.chat.delete({
-						channel: message_history[term][i].channel,
-						ts: message_history[term][i].ts
-					}).then((res) => {
-						//				console.log('<DEBUG> just deleted a history item res is', res);
-					})
-					.catch((err) => {
-						console.error('<Error><deleteHistoryItem><chat.delete> for term', term, '\nError is', err);
-					});
+					channel: message_history[term][i].channel,
+					ts: message_history[term][i].ts
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><chat.delete> for term', term, '\nError is', err);
+				});
 			}
 		}
 		delete message_history[term];
@@ -656,8 +726,9 @@ const deleteAllHistory = () => {
 }
 
 // Delete a message (or, if it's the first message in a thread, delete the whole thread)
+// This is used with an event subscription to delete things that might not already be in the history
 exports.deleteItem = (channel, ts) => {
-
+	// Get a list of any thread replies to delete as well
 	webClientBot.channels.replies({
 		channel: channel,
 		thread_ts: ts
@@ -668,45 +739,31 @@ exports.deleteItem = (channel, ts) => {
 				ts: message.ts
 			}).catch(console.error);
 		});
-
 	}).catch((err) => {
 		console.error('<Error><deleteItem><chat.delete>', err);
 	});
-	/*
-		webClientBot.chat.delete({
-			channel: channel,
-			ts: ts
-		}).catch(console.error);
-		*/
 }
 
-// Get the list of all users and their IDs
+// Get the list of all users and their IDs and store it for faster caching
 const buildUserList = (authBotId) => {
 	webClientBot.users.list()
 		.then((res) => {
-			//	console.log('<DEBUG> getUserList users.list resulted in',res);
 			user_list = res.members;
-			allUserIds = [];
-			user_list.forEach(function(user) {
-				if (!(user.id === authBotId || user.id === 'USLACKBOT')) {
-					allUserIds = allUserIds + "," + user.id;
-				}
-			});
-		})
-		.catch((err) => {
+		}).catch((err) => {
 			console.error('<Error><buildUserList><users.list>', err);
 		});
 }
 
 // Look up User ID from a Name
 const getUserId = (name) => {
-	//remove any spaces in the names from the list
+	//remove any spaces in the names being passed
 	name = name.replace(/\s+/g, '');
-	let id = user_list.find(o => o.name === name).id;
-	return id;
+	// TODO	let id = user_list.find(o => o.name === name).id;
+	// TODO	return id;
+	return user_list.find(o => o.name === name).id
 }
 
-// Get the list of all channels and their IDs
+// Get the list of all channels and their IDs and cache it
 const getChannelList = () => {
 	webClientBot.channels.list({
 			exclude_members: true,
@@ -730,6 +787,7 @@ const getChannelId = (name) => {
 	return result;
 }
 
+// Invite a list of users to a channel
 const inviteUsersToChannel = (channelId, userIdList) => {
 	webClientBot.channels.invite({
 		channel: channelId,
@@ -739,6 +797,7 @@ const inviteUsersToChannel = (channelId, userIdList) => {
 	});
 }
 
+// Create channels from the config info
 exports.createChannels = (channelInfo) => {
 	console.log('<Debug><Create Channels> Creating channels now for', channelInfo);
 
@@ -751,7 +810,13 @@ exports.createChannels = (channelInfo) => {
 		console.log('<Debug> Getting ready to do the check for who to invite for channel', channel.name, 'with id', id);
 
 		if (channel.users === 'all') {
-			userIdsToInvite = allUserIds;
+			//		userIdsToInvite = allUserIds;
+
+			user_list.forEach(function(user) {
+				if (!(user.id === authBotId || user.id === 'USLACKBOT')) {
+					userIdsToInvite = userIdsToInvite + "," + user.id;
+				}
+			});
 		} else if (channel.users) {
 			channel.users.split(',').forEach(function(user) {
 				userIdsToInvite = userIdsToInvite + "," + getUserId(user);
@@ -792,6 +857,7 @@ exports.createChannels = (channelInfo) => {
 	});
 }
 
+// Do the initial work to make sure there's a valid connection, cache users and channels
 exports.validateBotConnection = () => {
 	webClientBot.auth.test()
 		.then((res) => {
@@ -804,25 +870,24 @@ exports.validateBotConnection = () => {
 			console.log('<Loading> Bot connected to workspace', team);
 
 			// Cache info on the users for ID translation and inviting to channels
+			// TODO - make this the bot's ID so it's excluded?
 			buildUserList(user_id);
-
 			getChannelList();
-
 		})
 		.catch((err) => {
 			console.error('<Error><validateBotConnection><auth.test>', err);
 		});
-
 }
 
+// Build and send the StoryBot admin menu when called
 exports.adminMenu = (body) => {
 
 	const {
-		token,
+		//	token,
 		text,
 		response_url,
-		trigger_id,
-		command
+		//	trigger_id,
+		//	command
 	} = body;
 
 	//Build the admin menu for the bot
@@ -871,13 +936,11 @@ exports.adminMenu = (body) => {
 	}];
 
 	const webhook = new IncomingWebhook(response_url);
-
+	// TODO - consider cleaning these up to avoid excess clutter in the channel
 	webhook.send({
 		attachments: admin_menu,
 		response_type: 'ephemeral',
 		replace_original: true
-	}).then((res) => {
-		//	console.log('<Slash Command> Called webhook');
 	}).catch((err) => {
 		console.error('<Error><Admin Menu><webhook.send>', err);
 	});
@@ -885,9 +948,6 @@ exports.adminMenu = (body) => {
 
 // Handle the admin menu callbacks
 exports.adminCallback = (payload, respond) => {
-
-	//	console.log('<Admin Menu> Payload is', payload);
-
 	switch (payload.actions[0].value) {
 		case 'History':
 			{
@@ -930,7 +990,6 @@ exports.adminCallback = (payload, respond) => {
 		case 'Cleanup All':
 			{
 				let msg = deleteAllHistory();
-
 				response = {
 					text: msg,
 					replace_original: true,
@@ -947,13 +1006,14 @@ exports.adminCallback = (payload, respond) => {
 				};
 				break;
 			}
-
 	}
+	// Send back something immediately
+	// TODO - response prob isn't anything, right?
 	respond(response).catch(console.error);
 }
 
+// Clean up the history when a specific history term is being cleaned
 exports.historyCleanup = (payload, respond) => {
-
 	let msg = deleteHistoryItem(payload.actions[0].value);
 
 	response = {
@@ -962,89 +1022,4 @@ exports.historyCleanup = (payload, respond) => {
 		ephemeral: true
 	};
 	respond(response).catch(console.error);
-}
-
-
-exports.callbackMatch = (payload, respond, callback) => {
-	//console.log('<CallbacksMatch> DEBUG - received', callback, 'this is the payload', payload);
-
-	let response = {
-		text: "default response"
-	};
-
-	if (callback.dialog) {
-		response = {
-			trigger_id: payload.trigger_id,
-			dialog: callback.attachments
-		}
-		webClientBot.dialog.open(response).then((res) => {
-			//		console.log('<Debug><Callbacks> Dialog.Open worked with result', res);
-		}).catch((err) => {
-			console.error('<Error><callbackMatch><dialog.open> Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
-			console.error(err);
-		});
-
-	}
-	if (callback.ephemeral) {
-		webClientBot.chat.postEphemeral({
-			user: payload.user.id,
-			channel: payload.channel.id,
-			as_user: false,
-			link_names: true,
-			attachments: callback.attachments
-		}).catch((err) => {
-			console.error('<Error><callbackMatch><chat.postEphemeral>', err);
-		});
-	}
-	if (callback.invite) {
-
-		//Delay the item if specified, then execute the rest
-		delay(callback.delay * 1000)
-			.then((res) => {
-				response = {
-					user: getUserId(callback.username),
-					channel: payload.channel.id
-				}
-				//				console.log('INVITING response', response);
-
-				webClientBot.channels.invite(response).catch((err) => {
-					console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:', err);
-				});;
-			}).catch(console.error);
-
-	}
-
-	// try this to let multiple types of actions happen on a single callback script line
-	if ((!callback.dialog && !callback.ephemeral && !callback.invite) || (callback.invite && callback.update)) {
-		response = {
-			channel: payload.channel.id,
-			text: callback.text,
-			ts: payload.message_ts,
-			icon_url: callback.icon_url,
-			icon_emoji: callback.icon_emoji,
-			username: callback.username,
-			thread_ts: null,
-			link_names: true,
-			as_user: false,
-			attachments: callback.attachments
-		};
-
-		if (callback.channel != 'current') {
-			response.channel = getChannelId(callback.channel);
-		}
-
-		if (callback.update) {
-			//	console.log('<Callbacks> DEBUG - this is an update, using', response);
-			webClientBot.chat.update(response).catch((err) => {
-				console.error('<Error><callbackMatch><chat.update>', err);
-			});
-
-		} else {
-			//		console.log('<Callbacks> DEBUG - this is a new message, using', response);
-			webClientBot.chat.postMessage(response).catch((err) => {
-				console.error('<Error><callbackMatch><chat.postMessage>', err);
-			});;
-		}
-	}
-
 }

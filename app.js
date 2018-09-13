@@ -19,19 +19,10 @@ require('dotenv').config({
 var scriptConfig = require('./load-conf-google');
 var triggerKeys = [];
 
-// TODO: Do we still need these or can they be accessed directly from the config object?
-var callbackData = [];
-
 scriptConfig.loadConfig().then((result) => {
 	triggerKeys = Object.keys(result);
-
-	// If we're specifying dynamic callbacks in this config
-	if (result.Callbacks) {
-		result.Callbacks.forEach(function(callback) {
-			callbackData.push(callback.callback_name);
-		});
-	}
-	console.log('<Loading> Loaded config for keys:', triggerKeys, 'and Callbacks are:', callbackData);
+	console.log('<Loading> Loaded config for keys:', triggerKeys);
+	//console.log('<DEBUG>Total config is',scriptConfig);
 });
 
 // Express app server
@@ -68,8 +59,6 @@ const storyBotTools = require('./storytools.js');
 
 // Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
 slackEvents.on('message', (event) => {
-	console.log('INCOMING MESSAGE EVENT: ', event);
-
 	// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
 	// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
 	if (event.type === 'message' && !event.subtype && !event.bot_id) {
@@ -92,14 +81,12 @@ slackEvents.on('reaction_added', (event) => {
 		// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!!
 		// Use a unique reacji vs one being used elsewhere in the scripts
 		if (triggerKeys.indexOf(':' + event.reaction + ':') >= 0) {
-
 			let reaction_event = {
 				channel: event.item.channel,
 				ts: event.item.ts,
 				text: ':' + event.reaction + ':',
 				reaction: event.reaction
 			};
-
 			storyBotTools.playbackScript(scriptConfig.config[reaction_event.text], scriptConfig.config.Tokens, reaction_event);
 		}
 	}
@@ -110,11 +97,8 @@ slackEvents.on('error', console.error);
 
 //slackInteractions.action('callback_admin_menu', storyBotTools.adminCallback);
 slackInteractions.action('callback_admin_menu', (payload, respond) => {
-	//	console.log('OK heres what we have', payload);
-
 	switch (payload.actions[0].value) {
 		case 'Triggers':
-
 			{
 				if (triggerKeys.length > 0) {
 					let attachments = [];
@@ -146,28 +130,11 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 			}
 		case 'Reload Config':
 			{
-				// callbackData = [];
 				scriptConfig.loadConfig().then((result) => {
 					triggerKeys = Object.keys(result);
 
-					// If we're specifying dynamic callbacks in this config
-					if (result.Callbacks) {
-						result.Callbacks.forEach(function(callback) {
-							callbackData.push(callback.callback_name);
-						});
-					}
-
-					// If we're specifying dynamic callbacks in this config
-					if (result.Commands) {
-						result.Commands.forEach(function(command) {
-							commandData.push(command.command_name);
-						});
-					}
-					console.log('<Loading> Loaded config for keys:', triggerKeys, 'and Callbacks are:', callbackData, 'and Commands are:', commandData);
-
 					console.log('<Re-Loading>re-validating Bot Connection / building channel list');
 					storyBotTools.validateBotConnection();
-
 				});
 
 				respond({
@@ -203,15 +170,13 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 
 slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanup);
 
-
 slackInteractions.action(/callback_/, (payload, respond) => {
-	if (callbackData.indexOf(payload.callback_id) >= 0) {
+	if (scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id)) {
 		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
 	} else {
 		console.log('<Callback> No match in the config for', payload.callback_id);
 	}
 });
-
 
 ////Secrets secrets are no fun
 const bodyParser = require('body-parser');
@@ -223,10 +188,10 @@ app.use(bodyParser.urlencoded({
 		req.rawBody = body.toString();
 	}
 }));
+
 app.use(bodyParser.json());
 
 app.post('/slack/commands', function(req, res) {
-
 	const timeStamp = req.headers['x-slack-request-timestamp'];
 	const slashSig = req.headers['x-slack-signature'];
 	const reqBody = JSON.stringify(req.body);
@@ -245,23 +210,23 @@ app.post('/slack/commands', function(req, res) {
          Actual: ${slashSig}`);
 	}
 
-
 	let command = req.body.command;
 	let args = req.body.text;
+	//	console.log('<Debug><Slash Command> Received command', command, 'with overall info', req.body);
 
-	console.log('<Slash Command> Received command', command, 'with overall info', req.body);
 	// respond immediately!
 	res.status(200).end();
 
 	if (command === '/storybot') {
 		storyBotTools.adminMenu(req.body);
-		//	} else if (commandData.indexOf(command) >= 0) {
 	} else {
 		let indexMatch = indexOfIgnoreCase(triggerKeys, command + ' ' + args);
 
 		if (indexMatch >= 0) {
 			let slash_event = {
+				user: req.body.user_id,
 				channel: req.body.channel_id,
+				text: command + ' ' + args,
 				ts: 'slash',
 			};
 			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, slash_event);
@@ -275,7 +240,6 @@ app.get('/', (req, res) => {
 	res.send('<h2>StoryBot is running</h2>');
 });
 
-
 // Select a port for the server to listen on.
 const port = process.env.PORT || 3000;
 
@@ -283,9 +247,7 @@ const port = process.env.PORT || 3000;
 http.createServer(app).listen(port, () => {
 	console.log(`<Startup> server listening on port ${port}`);
 	storyBotTools.validateBotConnection();
-
 });
-
 
 // Borrowed code to do case-insensitive Array.indexOf
 /**
