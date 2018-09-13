@@ -54,7 +54,7 @@ exports.playbackScript = (config, tokens, event) => {
 	}
 
 	// Step through the trigger's script in the specified order
-	async.eachSeries(config, function(action, callback) {
+	async.eachSeries(config, function(action, nextItem) {
 
 		// Ignore blank lines that may have been ingested for some reason 
 		if (action.type) {
@@ -127,15 +127,15 @@ exports.playbackScript = (config, tokens, event) => {
 											ts: res.ts
 										}).then((res) => {
 											//Allow the async series to go forward
-											callback();
+											nextItem();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
+											nextItem();
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><chat.postMessage>', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
@@ -169,15 +169,15 @@ exports.playbackScript = (config, tokens, event) => {
 											ts: res.ts
 										}).then((res) => {
 											//Allow the async series to go forward
-											callback();
+											nextItem();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
+											nextItem();
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><chat.postMessage>', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
@@ -200,15 +200,15 @@ exports.playbackScript = (config, tokens, event) => {
 											ts: res.ts
 										}).then((res) => {
 											//Allow the async series to go forward
-											callback();
+											nextItem();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
+											nextItem();
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><reactions.add>', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
@@ -230,15 +230,15 @@ exports.playbackScript = (config, tokens, event) => {
 											ts: res.message_ts
 										}).then((res) => {
 											//Allow the async series to go forward
-											callback();
+											nextItem();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
+											nextItem();
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><chat.postEphemeral>', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
@@ -272,18 +272,18 @@ exports.playbackScript = (config, tokens, event) => {
 												ts: fileShareTS
 											}).catch((err) => {
 												console.error('<Error><Main Loop><addHistory>', err);
-												callback();
+												nextItem();
 											});
 											//Allow the async series to go forward
-											callback();
+											nextItem();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
+											nextItem();
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><files.upload>', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
@@ -305,15 +305,15 @@ exports.playbackScript = (config, tokens, event) => {
 											ts: res.message_ts // TODO - is this legit?
 										}).then((res) => {
 											//Allow the async series to go forward
-											callback();
+											nextItem();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
+											nextItem();
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><users.profile.set>', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
@@ -348,14 +348,14 @@ exports.playbackScript = (config, tokens, event) => {
 											ts: ts
 										}).then((result) => {
 											//Allow the async series to go forward
-											callback();
+											nextItem();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
+											nextItem();
 										});
 									}).catch((err) => {
 										console.error('API call for ', apiMethod, 'resulted in: ', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
@@ -387,18 +387,18 @@ exports.playbackScript = (config, tokens, event) => {
 												ts: res.file.shares.public[sharefileChannelId][0].ts
 											}).then((result) => {
 												//Allow the async series to go forward
-												callback();
+												nextItem();
 											}).catch((err) => {
 												console.error('<Error><Main Loop><addHistory>', err);
-												callback();
+												nextItem();
 											});
 										}).catch((err) => {
 											console.error('<Error><Main Loop><ShareFile><files.info>', err);
-											callback();
+											nextItem();
 										});
 									}).catch((err) => {
 										console.error('API call for ', apiMethod, 'resulted in: ', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
@@ -419,21 +419,21 @@ exports.playbackScript = (config, tokens, event) => {
 											user: userId
 										}).then((res) => {
 											//Allow the async series to go forward
-											callback();
+											nextItem();
 										}).catch((err) => {
 											console.error('<Error><Main Loop><addHistory>', err);
-											callback();
+											nextItem();
 										});
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><channels.invite>', err);
-										callback();
+										nextItem();
 									});
 									break;
 								}
 							default:
 								console.log('Nothing matched to the action type?');
-								callback();
+								nextItem();
 								break;
 						}
 						// All of this botuser stuff enables quick protyping without tokens
@@ -468,14 +468,14 @@ exports.playbackScript = (config, tokens, event) => {
 										ts: res.ts
 									}).then((res) => {
 										//Allow the async series to go forward
-										callback();
+										nextItem();
 									}).catch((err) => {
 										console.error('<Error><Main Loop><Prototype addHistory>', err);
-										callback();
+										nextItem();
 									});
 								}).catch((err) => {
 									console.error('<Error><Main Loop><Prototype reactions.add>', err);
-									callback();
+									nextItem();
 								});
 							// Otherwise this is a message/bot message
 						} else {
@@ -499,21 +499,21 @@ exports.playbackScript = (config, tokens, event) => {
 									ts: res.ts
 								}).then((res) => {
 									//Allow the async series to go forward
-									callback();
+									nextItem();
 								}).catch((err) => {
 									console.error('<Error><Main Loop><addHistory>', err);
-									callback();
+									nextItem();
 								});
 							}).catch((err) => {
 								console.error('<Error><Main Loop><chat.postMessage>', err);
-								callback();
+								nextItem();
 							});
 						}
 					}
 				})
 				.catch((err) => {
 					console.error('<Error><Delay><Main Loop>', err);
-					callback();
+					nextItem();
 				});
 		}
 	})
@@ -634,6 +634,197 @@ exports.callbackMatch = (payload, respond, callback) => {
 	}).catch(console.error);
 }
 
+// Delete something from the history
+const deleteHistoryItem = (term) => {
+	if (!message_history[term]) {
+		console.log('<Error><deleteHistoryItem> Well this is embarassing:' + term + "doesn't exist in history");
+		// Send this back to format an in-Slack message
+		return 'Well this is embarassing: ' + term + " doesn't exist in history";
+	} else {
+		async.each(message_history[term], function(historyItem, nextItem) {
+			if (historyItem.type === 'file') {
+				webClientBot.files.delete({
+					file: historyItem.ts
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><files.delete>', err);
+				});
+			} else if (historyItem.type === 'status') {
+				webClientBot.users.profile.set({
+					user: getUserId(historyItem.username),
+					profile: {
+						"status_text": "",
+						"status_emoji": ""
+					}
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><users.profile.set>', err);
+				});
+			} else if (historyItem.type === 'invite') {
+				webClientBot.channels.kick({
+					channel: historyItem.channel,
+					user: historyItem.user
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><channels.kick>', err);
+				});
+			} else if (historyItem.type === 'reaction_trigger') {
+				console.log('<DEBUG><reaction trigger history delete> name:', historyItem.reaction, 'channel:', historyItem.channel, 'timestamp:', historyItem.ts);
+				webClientBot.reactions.remove({
+					name: historyItem.reaction,
+					channel: historyItem.channel,
+					timestamp: historyItem.ts
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'and item', historyItem, '\nError is', err);
+					console.log('<DEBUG><ERROR><reaction trigger history delete> name:', historyItem.reaction, 'channel:', historyItem.channel, 'timestamp:', historyItem.ts);
+
+				});
+			} else if (!(historyItem.type === 'reaction') && !(historyItem.type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
+				webClientBot.chat.delete({
+					channel: historyItem.channel,
+					ts: historyItem.ts
+				}).catch((err) => {
+					console.error('<Error><deleteHistoryItem><chat.delete> for term', term, '\nError is', err);
+				});
+			}
+			nextItem();
+		});
+		delete message_history[term];
+		console.log('<History> Successfully deleted', term, 'from the history.');
+		return 'Successfully deleted ' + term + ' from the history.';
+	}
+}
+
+// Build and send the StoryBot admin menu when called
+exports.adminMenu = (body) => {
+
+	const {
+		//	token,
+		text,
+		response_url,
+		//	trigger_id,
+		//	command
+	} = body;
+
+	//Build the admin menu for the bot
+	const admin_menu = [{
+		fallback: 'Storybot Admin Menu',
+		color: '#3f2cbc',
+		mrkdwn_in: [
+			'text',
+			'pretext',
+			'fields'
+		],
+		pretext: 'StoryBot Admin & Config Tools',
+		callback_id: 'callback_admin_menu',
+		attachment_type: 'default',
+		actions: [{
+			name: 'Triggers',
+			text: 'Triggers',
+			type: 'button',
+			style: 'default',
+			value: 'Triggers'
+		}, {
+			name: 'History',
+			text: 'History',
+			type: 'button',
+			style: 'default',
+			value: 'History'
+		}, {
+			name: 'Cleanup All',
+			text: 'Cleanup All',
+			type: 'button',
+			style: 'default',
+			value: 'Cleanup All'
+		}, {
+			name: 'Reload Config',
+			text: 'Reload Config',
+			type: 'button',
+			style: 'default',
+			value: 'Reload Config'
+		}, {
+			name: 'Create Channels',
+			text: 'Create Channels',
+			type: 'button',
+			style: 'default',
+			value: 'Create Channels'
+		}]
+	}];
+
+	const webhook = new IncomingWebhook(response_url);
+	// TODO - consider cleaning these up to avoid excess clutter in the channel
+	webhook.send({
+		attachments: admin_menu,
+		response_type: 'ephemeral',
+		replace_original: true
+	}).catch((err) => {
+		console.error('<Error><Admin Menu><webhook.send>', err);
+	});
+}
+
+// Handle the admin menu callbacks
+exports.adminCallback = (payload, respond) => {
+	switch (payload.actions[0].value) {
+		case 'History':
+			{
+				console.log('<Admin Menu> History is:', message_history);
+				let message_history_keys = Object.keys(message_history);
+
+				if (message_history_keys.length > 0) {
+					let attachments = [];
+					let actions = [];
+					message_history_keys.forEach(function(key) {
+						actions.push({
+							name: key,
+							text: key,
+							value: key,
+							type: 'button'
+						});
+					});
+
+					attachments.push({
+						actions: actions,
+						title: "These are the triggers you've run. Click to cleanup:",
+						mrkdwn_in: ['text', 'fields'],
+						callback_id: 'callback_history_cleanup'
+					});
+
+					response = {
+						response_type: 'ephemeral',
+						replace_original: true,
+						attachments: attachments
+					};
+				} else {
+					response = {
+						response_type: 'ephemeral',
+						replace_original: true,
+						text: "No history right now"
+					}
+				}
+				break;
+			}
+		case 'Cleanup All':
+			{
+				let msg = deleteAllHistory();
+				response = {
+					text: msg,
+					replace_original: true,
+					ephemeral: true
+				};
+				break;
+			}
+		default:
+			{
+				response = {
+					text: ":thinking_face: Not sure how that happened",
+					replace_original: true,
+					ephemeral: true
+				};
+				break;
+			}
+	}
+	// Send back something immediately
+	// TODO - response prob isn't anything, right?
+	respond(response).catch(console.error);
+}
+
 //
 // Helper Functions
 //
@@ -653,61 +844,6 @@ const addHistory = (name, data) => {
 		}
 		resolve(message_history[name].push(data));
 	});
-}
-
-// Delete something from the history
-const deleteHistoryItem = (term) => {
-	if (!message_history[term]) {
-		console.log('<Error><deleteHistoryItem> Well this is embarassing:' + term + "doesn't exist in history");
-		// Send this back to format an in-Slack message
-		return 'Well this is embarassing: ' + term + " doesn't exist in history";
-	} else {
-		for (let i = message_history[term].length - 1; i >= 0; i--) {
-			if (message_history[term][i].type === 'file') {
-				webClientBot.files.delete({
-					file: message_history[term][i].ts
-				}).catch((err) => {
-					console.error('<Error><deleteHistoryItem><files.delete>', err);
-				});
-			} else if (message_history[term][i].type === 'status') {
-				webClientBot.users.profile.set({
-					user: getUserId(message_history[term][i].username),
-					profile: {
-						"status_text": "",
-						"status_emoji": ""
-					}
-				}).catch((err) => {
-					console.error('<Error><deleteHistoryItem><users.profile.set>', err);
-				});
-			} else if (message_history[term][i].type === 'invite') {
-				webClientBot.channels.kick({
-					channel: message_history[term][i].channel,
-					user: message_history[term][i].user
-				}).catch((err) => {
-					console.error('<Error><deleteHistoryItem><channels.kick>', err);
-				});
-			} else if (message_history[term][i].type === 'reaction_trigger') {
-				console.log('<DEBUG><reaction trigger history delete> name:',message_history[term][i].reaction,'channel:',message_history[term][i].channel,'timestamp:',message_history[term][i].ts);
-				webClientBot.reactions.remove({
-					name: message_history[term][i].reaction,
-					channel: message_history[term][i].channel,
-					timestamp: message_history[term][i].ts
-				}).catch((err) => {
-					console.error('<Error><deleteHistoryItem><reactions.remove> for term', term, 'with i=', i, 'and overall history is ', message_history[term], '\nError is', err);
-				});
-			} else if (!(message_history[term][i].type === 'reaction') && !(message_history[term][i].type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
-				webClientBot.chat.delete({
-					channel: message_history[term][i].channel,
-					ts: message_history[term][i].ts
-				}).catch((err) => {
-					console.error('<Error><deleteHistoryItem><chat.delete> for term', term, '\nError is', err);
-				});
-			}
-		}
-		delete message_history[term];
-		console.log('<History> Successfully deleted', term, 'from the history.');
-		return 'Successfully deleted ' + term + ' from the history.';
-	}
 }
 
 // Burn it all down
@@ -877,139 +1013,6 @@ exports.validateBotConnection = () => {
 		.catch((err) => {
 			console.error('<Error><validateBotConnection><auth.test>', err);
 		});
-}
-
-// Build and send the StoryBot admin menu when called
-exports.adminMenu = (body) => {
-
-	const {
-		//	token,
-		text,
-		response_url,
-		//	trigger_id,
-		//	command
-	} = body;
-
-	//Build the admin menu for the bot
-	const admin_menu = [{
-		fallback: 'Storybot Admin Menu',
-		color: '#3f2cbc',
-		mrkdwn_in: [
-			'text',
-			'pretext',
-			'fields'
-		],
-		pretext: 'StoryBot Admin & Config Tools',
-		callback_id: 'callback_admin_menu',
-		attachment_type: 'default',
-		actions: [{
-			name: 'Triggers',
-			text: 'Triggers',
-			type: 'button',
-			style: 'default',
-			value: 'Triggers'
-		}, {
-			name: 'History',
-			text: 'History',
-			type: 'button',
-			style: 'default',
-			value: 'History'
-		}, {
-			name: 'Cleanup All',
-			text: 'Cleanup All',
-			type: 'button',
-			style: 'default',
-			value: 'Cleanup All'
-		}, {
-			name: 'Reload Config',
-			text: 'Reload Config',
-			type: 'button',
-			style: 'default',
-			value: 'Reload Config'
-		}, {
-			name: 'Create Channels',
-			text: 'Create Channels',
-			type: 'button',
-			style: 'default',
-			value: 'Create Channels'
-		}]
-	}];
-
-	const webhook = new IncomingWebhook(response_url);
-	// TODO - consider cleaning these up to avoid excess clutter in the channel
-	webhook.send({
-		attachments: admin_menu,
-		response_type: 'ephemeral',
-		replace_original: true
-	}).catch((err) => {
-		console.error('<Error><Admin Menu><webhook.send>', err);
-	});
-}
-
-// Handle the admin menu callbacks
-exports.adminCallback = (payload, respond) => {
-	switch (payload.actions[0].value) {
-		case 'History':
-			{
-				console.log('<Admin Menu> History is:', message_history);
-				let message_history_keys = Object.keys(message_history);
-
-				if (message_history_keys.length > 0) {
-					let attachments = [];
-					let actions = [];
-					message_history_keys.forEach(function(key) {
-						actions.push({
-							name: key,
-							text: key,
-							value: key,
-							type: 'button'
-						});
-					});
-
-					attachments.push({
-						actions: actions,
-						title: "These are the triggers you've run. Click to cleanup:",
-						mrkdwn_in: ['text', 'fields'],
-						callback_id: 'callback_history_cleanup'
-					});
-
-					response = {
-						response_type: 'ephemeral',
-						replace_original: true,
-						attachments: attachments
-					};
-				} else {
-					response = {
-						response_type: 'ephemeral',
-						replace_original: true,
-						text: "No history right now"
-					}
-				}
-				break;
-			}
-		case 'Cleanup All':
-			{
-				let msg = deleteAllHistory();
-				response = {
-					text: msg,
-					replace_original: true,
-					ephemeral: true
-				};
-				break;
-			}
-		default:
-			{
-				response = {
-					text: ":thinking_face: Not sure how that happened",
-					replace_original: true,
-					ephemeral: true
-				};
-				break;
-			}
-	}
-	// Send back something immediately
-	// TODO - response prob isn't anything, right?
-	respond(response).catch(console.error);
 }
 
 // Clean up the history when a specific history term is being cleaned

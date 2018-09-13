@@ -104,7 +104,7 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 					let attachments = [];
 					let key_list = ""
 					triggerKeys.forEach(function(key) {
-						if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks' || key === 'Commands')) {
+						if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks')) {
 							key_list = key_list + " \`" + key + "\`";
 						}
 					});
