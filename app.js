@@ -15,14 +15,13 @@ require('dotenv').config({
 	path: `${config_file}`
 });
 
-//Load the appropriate config file from Google Sheets
+// Load the appropriate config file from Google Sheets
 var scriptConfig = require('./load-conf-google');
 var triggerKeys = [];
 
 scriptConfig.loadConfig().then((result) => {
 	triggerKeys = Object.keys(result);
 	console.log('<Loading> Loaded config for keys:', triggerKeys);
-	//console.log('<DEBUG>Total config is',scriptConfig);
 });
 
 // Express app server
@@ -37,9 +36,6 @@ const {
 	createEventAdapter,
 	verifyRequestSignature
 } = require('@slack/events-api');
-
-// An access token (from your Slack app or custom integration - xoxp, xoxb, or xoxa)
-//const token = process.env.SLACK_BOT_TOKEN;
 
 // Create the adapter using the app's verification token, read from environment variable
 const slackInteractions = createMessageAdapter(process.env.SLACK_SIGNING_SECRET);
@@ -64,7 +60,6 @@ slackEvents.on('message', (event) => {
 	if (event.type === 'message' && !event.subtype && !event.bot_id) {
 		// Matched a trigger from a user so playback the story
 		let indexMatch = indexOfIgnoreCase(triggerKeys, event.text);
-
 		if (indexMatch >= 0) {
 			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, event);
 		}
@@ -73,14 +68,14 @@ slackEvents.on('message', (event) => {
 
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event) => {
-	//	console.log('INCOMING REACTION EVENT: ',event);
 	// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
 	if (event.reaction === 'skull') {
 		storyBotTools.deleteItem(event.item.channel, event.item.ts);
 	} else {
-		// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!!
+		// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
 		// Use a unique reacji vs one being used elsewhere in the scripts
 		if (triggerKeys.indexOf(':' + event.reaction + ':') >= 0) {
+			// Need to pass some basic event details to mimic what happens with a real event
 			let reaction_event = {
 				channel: event.item.channel,
 				ts: event.item.ts,
@@ -95,7 +90,7 @@ slackEvents.on('reaction_added', (event) => {
 // Handle errors (see `errorCodes` export)
 slackEvents.on('error', console.error);
 
-//slackInteractions.action('callback_admin_menu', storyBotTools.adminCallback);
+// Our special callback menu
 slackInteractions.action('callback_admin_menu', (payload, respond) => {
 	switch (payload.actions[0].value) {
 		case 'Triggers':
@@ -132,7 +127,6 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 			{
 				scriptConfig.loadConfig().then((result) => {
 					triggerKeys = Object.keys(result);
-
 					console.log('<Re-Loading>re-validating Bot Connection / building channel list');
 					storyBotTools.validateBotConnection();
 				});
@@ -168,8 +162,10 @@ slackInteractions.action('callback_admin_menu', (payload, respond) => {
 	}
 });
 
+// Deal with the history cleanup
 slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanup);
 
+// Look for matches for dynamic callbacks
 slackInteractions.action(/callback_/, (payload, respond) => {
 	if (scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id)) {
 		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
@@ -178,7 +174,9 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 	}
 });
 
-////Secrets secrets are no fun
+// 
+// Secrets secrets are no fun
+// 
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 
@@ -191,12 +189,16 @@ app.use(bodyParser.urlencoded({
 
 app.use(bodyParser.json());
 
+// Handle slash commands and check secrets
 app.post('/slack/commands', function(req, res) {
+	// respond immediately!
+	res.status(200).end();
+	let command = req.body.command;
+	let args = req.body.text;
 	const timeStamp = req.headers['x-slack-request-timestamp'];
 	const slashSig = req.headers['x-slack-signature'];
 	const reqBody = JSON.stringify(req.body);
 	const baseString = `v0:${timeStamp}:${req.rawBody}`;
-
 	const hmac = crypto.createHmac('sha256', process.env.SLACK_SIGNING_SECRET);
 	JSON.stringify(hmac.update(baseString));
 	const mySignature = `v0=${hmac.digest(`hex`)}`;
@@ -210,16 +212,10 @@ app.post('/slack/commands', function(req, res) {
          Actual: ${slashSig}`);
 	}
 
-	let command = req.body.command;
-	let args = req.body.text;
-	//	console.log('<Debug><Slash Command> Received command', command, 'with overall info', req.body);
-
-	// respond immediately!
-	res.status(200).end();
-
 	if (command === '/storybot') {
 		storyBotTools.adminMenu(req.body);
 	} else {
+		// Look if there's a trigger for a fake slash command and use it with a real slash command!
 		let indexMatch = indexOfIgnoreCase(triggerKeys, command + ' ' + args);
 
 		if (indexMatch >= 0) {
@@ -236,6 +232,7 @@ app.post('/slack/commands', function(req, res) {
 	}
 });
 
+// The main site
 app.get('/', (req, res) => {
 	res.send('<h2>StoryBot is running</h2>');
 });

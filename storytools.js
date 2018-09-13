@@ -527,34 +527,36 @@ exports.callbackMatch = (payload, respond, callback) => {
 		text: "default response"
 	};
 
-	//Delay the item if specified, then execute the rest
+
+	// Check for some of the options for a Callback - these can be combined together
+
+	// Dialog response to callback is true
+	if (callback.dialog) {
+		response = {
+			trigger_id: payload.trigger_id,
+			dialog: callback.attachments
+		}
+		webClientBot.dialog.open(response).catch((err) => {
+			console.error('<Error><callbackMatch><dialog.open> Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
+		});
+	}
+
+	// Ephemeral response as well
+	if (callback.ephemeral) {
+		webClientBot.chat.postEphemeral({
+			user: payload.user.id,
+			channel: payload.channel.id,
+			as_user: false,
+			link_names: true,
+			attachments: callback.attachments
+		}).catch((err) => {
+			console.error('<Error><callbackMatch><chat.postEphemeral>', err);
+		});
+	}
+
+	// Delay the item if specified, then execute the rest
+	// I don't know that anything else would need a delay, this is really just for the invite + other messages for Fox WC Demo 
 	delay(callback.delay * 1000).then((res) => {
-		// Check for some of the options for a Callback - these can be combined together
-
-		// Dialog response to callback is true
-		if (callback.dialog) {
-			response = {
-				trigger_id: payload.trigger_id,
-				dialog: callback.attachments
-			}
-			webClientBot.dialog.open(response).catch((err) => {
-				console.error('<Error><callbackMatch><dialog.open> Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
-			});
-		}
-
-		// Ephemeral response as well
-		if (callback.ephemeral) {
-			webClientBot.chat.postEphemeral({
-				user: payload.user.id,
-				channel: payload.channel.id,
-				as_user: false,
-				link_names: true,
-				attachments: callback.attachments
-			}).catch((err) => {
-				console.error('<Error><callbackMatch><chat.postEphemeral>', err);
-			});
-		}
-
 		// Invite based on an interactive message
 		if (callback.invite) {
 			let userId = getUserId(callback.username)
@@ -578,60 +580,62 @@ exports.callbackMatch = (payload, respond, callback) => {
 					console.error('<Error><callbackMatch><channels.invite> with params', response, 'and err:', err);
 				});
 		}
-
-		// If there are additional callback items to process, do them
-		if ((!callback.dialog && !callback.ephemeral && !callback.invite) || (callback.invite && callback.update)) {
-			response = {
-				channel: payload.channel.id,
-				text: callback.text,
-				ts: payload.message_ts,
-				icon_url: callback.icon_url,
-				icon_emoji: callback.icon_emoji,
-				username: callback.username,
-				thread_ts: null,
-				link_names: true,
-				as_user: false,
-				attachments: callback.attachments
-			};
-
-			if (callback.channel != 'current') {
-				response.channel = getChannelId(callback.channel);
-			}
-
-			if (callback.update) {
-				webClientBot.chat.update(response)
-					.then((res) => {
-						//Add what just happened to the history
-						addHistory(callback.callback_name, {
-							item: -10,
-							type: 'callback_postMessage',
-							channel: res.channel,
-							ts: res.ts
-						}).catch((err) => {
-							console.error('<Error><CallbackMatch><addHistory>', err);
-						});
-					}).catch((err) => {
-						console.error('<Error><callbackMatch><chat.update>', err);
-					});
-			} else {
-				webClientBot.chat.postMessage(response)
-					.then((res) => {
-						//Add what just happened to the history
-						addHistory(callback.callback_name, {
-							item: -10,
-							type: 'callback_postMessage',
-							channel: res.channel,
-							ts: res.ts
-						}).catch((err) => {
-							console.error('<Error><CallbackMatch><addHistory>', err);
-						});
-					})
-					.catch((err) => {
-						console.error('<Error><callbackMatch><chat.postMessage>', err);
-					});;
-			}
-		}
 	}).catch(console.error);
+
+	// If there are additional callback items to process, do them
+	if ((!callback.dialog && !callback.ephemeral && !callback.invite) || (callback.invite && callback.update)) {
+		response = {
+			channel: payload.channel.id,
+			text: callback.text,
+			ts: payload.message_ts,
+			icon_url: callback.icon_url,
+			icon_emoji: callback.icon_emoji,
+			username: callback.username,
+			thread_ts: null,
+			link_names: true,
+			as_user: false,
+			attachments: callback.attachments
+		};
+
+		if (callback.channel != 'current') {
+			response.channel = getChannelId(callback.channel);
+		}
+
+		if (callback.update) {
+			// TODO - This should be a respond(), right?
+			webClientBot.chat.update(response)
+				.then((res) => {
+					//Add what just happened to the history
+					addHistory(callback.callback_name, {
+						item: -10,
+						type: 'callback_postMessage',
+						channel: res.channel,
+						ts: res.ts
+					}).catch((err) => {
+						console.error('<Error><CallbackMatch><addHistory>', err);
+					});
+				}).catch((err) => {
+					console.error('<Error><callbackMatch><chat.update>', err);
+				});
+		} else {
+			// TODO - This should be a respond(), right?
+			webClientBot.chat.postMessage(response)
+				.then((res) => {
+					//Add what just happened to the history
+					addHistory(callback.callback_name, {
+						item: -10,
+						type: 'callback_postMessage',
+						channel: res.channel,
+						ts: res.ts
+					}).catch((err) => {
+						console.error('<Error><CallbackMatch><addHistory>', err);
+					});
+				})
+				.catch((err) => {
+					console.error('<Error><callbackMatch><chat.postMessage>', err);
+				});;
+		}
+	}
 }
 
 // Delete something from the history
