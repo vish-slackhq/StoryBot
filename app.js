@@ -232,6 +232,45 @@ app.post('/slack/commands', function(req, res) {
 	}
 });
 
+// Fun with oAuth
+redis = require('./redis');
+// Create a new web client
+const {
+	WebClient
+} = require('@slack/client');
+const webClientAuth = new WebClient(process.env.SLACK_BOT_TOKEN);
+const qs = require('querystring');
+ // OAuth Handler - this URL is connected through https://myURL/intstall in the Oauth and Permissions page
+// Usually the URL is your ngrok redirect until the app gets moved to where ever you would like to host it!
+app.get('/install', (req, res) => {
+	if (req.query.code) {
+		console.log('CODE!',req.query);
+		let redirect = team => res.redirect(team.url)
+		//Storing the team ID in redis so we can verify the app by team token
+		//key value pair - team id, auth snippet
+		let setAuth = auth => redis.set(auth.team_id, auth)
+ 		let testAuth = auth => webClientAuth.auth.test({
+			token: auth.access_token
+		});
+ 		let args = {
+			client_id: process.env.SLACK_CLIENT_ID,
+			client_secret: process.env.SLACK_CLIENT_SECRET,
+			code: req.query.code
+		}
+		//	slack.send('oauth.access', args).then(setAuth).then(testAuth).then(redirect)
+		webClientAuth.oauth.access(args).then(setAuth).then(testAuth).then(redirect);
+	} else {
+	/*	let url = slack.authorizeUrl({
+			client_id: process.env.CLIENT_ID,
+			scope: process.env.SCOPE
+		})*/
+		res.redirect("https://slack.com/oauth/authorize?" + qs.stringify({
+			client_id: process.env.SLACK_CLIENT_ID,
+			scope: process.env.SLACK_SCOPE
+		}));
+	}
+})
+
 // The main site
 app.get('/', (req, res) => {
 	res.send('<h2>StoryBot is running</h2>');
