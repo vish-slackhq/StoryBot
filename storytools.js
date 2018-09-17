@@ -159,50 +159,26 @@ exports.playbackScript = (config, tokens, event) => {
 										params.channel = event.channel;
 									}
 
-									if (!action.ephemeral) {
-										webClientBot.chat.postMessage(params)
-											.then((res) => {
-												//Add what just happened to the history
-												addHistory(trigger_term, {
-													item: action.item,
-													type: action.type,
-													channel: res.channel,
-													ts: res.ts
-												}).then((res) => {
-													//Allow the async series to go forward
-													nextItem();
-												}).catch((err) => {
-													console.error('<Error><Main Loop><addHistory>', err);
-													nextItem();
-												});
-											})
-											.catch((err) => {
-												console.error('<Error><Main Loop><chat.postMessage>', err);
-												nextItem();
-											});
-									} else {
-										params.user = event.user;
-										webClientBot.chat.postEphemeral(params)
-											.then((res) => {
-												//Add what just happened to the history
-												addHistory(trigger_term, {
-													item: action.item,
-													type: 'ephemeral',
-													channel: res.channel,
-													ts: res.message_ts
-												}).then((res) => {
-													//Allow the async series to go forward
-													nextItem();
-												}).catch((err) => {
-													console.error('<Error><Main Loop><addHistory>', err);
-													nextItem();
-												});
-											})
-											.catch((err) => {
-												console.error('<Error><Main Loop><chat.postEphemeral>', err);
-												nextItem();
-											});
-									}
+									webClientBot.chat.postMessage(params)
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											nextItem();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											nextItem();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postMessage>', err);
+										nextItem();
+									});
 									break;
 								}
 							case 'reaction':
@@ -232,6 +208,36 @@ exports.playbackScript = (config, tokens, event) => {
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><reactions.add>', err);
+										nextItem();
+									});
+									break;
+								}
+							case 'ephemeral':
+								{
+									webClientBot.chat.postEphemeral({
+										user: event.user,
+										channel: event.channel,
+										as_user: false,
+										link_names: true,
+										attachments: action.attachments
+									})
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.message_ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											nextItem();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											nextItem();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postEphemeral>', err);
 										nextItem();
 									});
 									break;
