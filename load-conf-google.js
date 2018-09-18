@@ -6,18 +6,33 @@
 
 const extractGSheet = require('spreadsheet-to-json');
 require('dotenv').config();
+var googleData = {};
+
+exports.setConfig = (args) => {
+  // TODO this is not elegant, but let's just test if this can work
+  if (args.gsheetID) {
+    googleData.gsheetID = args.gsheetID;
+  }
+   if (args.clientEmail) {
+    googleData.clientEmail = args.clientEmail;
+  }
+   if (args.privateKey) {
+    googleData.privateKey = args.privateKey;
+  }
+}
 
 // Load config
 exports.loadConfig = () => {
+  console.log('<DEBUG><Config><loadConfig> googleData:',googleData);
   return new Promise((resolve) => {
     extractGSheet.extractSheets({
       // your google spreadhsheet key 
-      spreadsheetKey: process.env.GSHEET_ID,
+      spreadsheetKey: googleData.gsheetID, // || process.env.GSHEET_ID,
       // your google oauth2 credentials 
       //   credentials: require(process.env.GOOGLE_API_CREDS || './google_sheets_creds.json'),
       credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY
+        client_email: googleData.clientEmail, // || process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: googleData.privateKey, // || process.env.GOOGLE_PRIVATE_KEY
       },
       // names of the sheet you want to extract (or [] for all) 
       sheetsToExtract: []

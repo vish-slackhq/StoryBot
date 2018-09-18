@@ -18,6 +18,12 @@ require('dotenv').config({
 // Load the appropriate config file from Google Sheets
 var scriptConfig = require('./load-conf-google');
 
+scriptConfig.setConfig({
+	gsheetID: process.env.GSHEET_ID,
+	clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
+	privateKey: process.env.GOOGLE_PRIVATE_KEY
+});
+
 scriptConfig.loadConfig().catch(console.error);
 
 // Express app server
@@ -189,7 +195,7 @@ http.createServer(app).listen(port, () => {
  * @returns {Number} the index of the element in the array or -1 if not found.
  */
 function indexOfIgnoreCase(array, element) {
-	var ret = -1;
+	let ret = -1;
 	array.some(function(ele, index, array) {
 		if (element.toLowerCase() === ele.toLowerCase()) {
 			ret = index;
