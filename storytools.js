@@ -14,16 +14,16 @@ const {
 const {
 	WebClient
 } = require('@slack/client');
+// Let's try this - empty WebClient for global, will be set on bot startup with the right user token
+var webClientUser = null;
 
 // TODO: figure out this whole token mess
-// const webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
-const webClientBot = new WebClient(process.env.SLACK_AUTH_TOKEN);
+//const webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
 
 // Global variables - way to not need these?
 var message_history = []; // maintains the running session history, used for deletes and reply/reaction targets
 var user_list = []; // cached user list for quicker lookups
 var channel_list = []; // cached channel list for quicker lookups
-//var allUserIds = [];
 
 // The main function that plays back a given trigger once it's matched
 // Takes the config for the specific trigger we are playing back, list of user tokens, and event data
@@ -61,7 +61,7 @@ exports.playbackScript = (config, tokens, event) => {
 
 			//Clean up a fake slash command or other item that has `delete_trigger` set
 			if (action.delete_trigger) {
-				webClientBot.chat.delete({
+				webClientUser.chat.delete({
 					channel: event.channel,
 					ts: event.ts
 				}).catch((err) => {
@@ -127,7 +127,7 @@ exports.playbackScript = (config, tokens, event) => {
 							case 'message':
 							case 'reply':
 								{
-									webClientBot.chat.postMessage({
+									webClientUser.chat.postMessage({
 										token: tokens.find(o => o.name === action.username).token, //look up the user's token to post on their behalf
 										as_user: true,
 										username: action.username,
@@ -180,7 +180,7 @@ exports.playbackScript = (config, tokens, event) => {
 									}
 
 									if (!action.ephemeral) {
-										webClientBot.chat.postMessage(params)
+										webClientUser.chat.postMessage(params)
 											.then((res) => {
 												//Add what just happened to the history
 												addHistory(trigger_term, {
@@ -202,7 +202,7 @@ exports.playbackScript = (config, tokens, event) => {
 											});
 									} else {
 										params.user = event.user;
-										webClientBot.chat.postEphemeral(params)
+										webClientUser.chat.postEphemeral(params)
 											.then((res) => {
 												//Add what just happened to the history
 												addHistory(trigger_term, {
@@ -227,7 +227,7 @@ exports.playbackScript = (config, tokens, event) => {
 								}
 							case 'reaction':
 								{
-									webClientBot.reactions.add({
+									webClientUser.reactions.add({
 										token: tokens.find(o => o.name === action.username).token,
 										as_user: true,
 										username: action.username,
@@ -258,7 +258,7 @@ exports.playbackScript = (config, tokens, event) => {
 								}
 							case 'file':
 								{
-									webClientBot.files.upload({
+									webClientUser.files.upload({
 										token: tokens.find(o => o.name === action.username).token,
 										channels: action.channel,
 										filetype: action.filetype,
@@ -303,7 +303,7 @@ exports.playbackScript = (config, tokens, event) => {
 								}
 							case 'status':
 								{
-									webClientBot.users.profile.set({
+									webClientUser.users.profile.set({
 										token: tokens.find(o => o.name === action.username).token,
 										profile: {
 											"status_text": action.text,
@@ -390,7 +390,7 @@ exports.playbackScript = (config, tokens, event) => {
 									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
 									.then((result) => {
 										// Need to get back some additional information to account for File Threads
-										webClientBot.files.info({
+										webClientUser.files.info({
 											file: action.target_item
 										}).then((res) => {
 											//Add what just happened to the history
@@ -419,7 +419,7 @@ exports.playbackScript = (config, tokens, event) => {
 							case 'invite':
 								{
 									let userId = getUserId(action.text)
-									webClientBot.channels.invite({
+									webClientUser.channels.invite({
 										token: tokens.find(o => o.name === action.username).token,
 										channel: getChannelId(action.channel),
 										user: userId
@@ -466,7 +466,7 @@ exports.playbackScript = (config, tokens, event) => {
 						}
 						// Prototype reaction
 						if (action.reaction) {
-							webClientBot.reactions.add({
+							webClientUser.reactions.add({
 									as_user: false,
 									username: action.username,
 									channel: target_channel,
@@ -493,7 +493,7 @@ exports.playbackScript = (config, tokens, event) => {
 								});
 							// Otherwise this is a message/bot message
 						} else {
-							webClientBot.chat.postMessage({
+							webClientUser.chat.postMessage({
 								as_user: false,
 								username: action.username,
 								channel: action.channel,
@@ -557,14 +557,14 @@ exports.callbackMatch = (payload, respond, callback) => {
 			trigger_id: payload.trigger_id,
 			dialog: callback.attachments
 		}
-		webClientBot.dialog.open(response).catch((err) => {
+		webClientUser.dialog.open(response).catch((err) => {
 			console.error('<Error><callbackMatch><dialog.open> Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
 		});
 	}
 
 	// Ephemeral response as well
 	if (callback.ephemeral) {
-		webClientBot.chat.postEphemeral({
+		webClientUser.chat.postEphemeral({
 			user: payload.user.id,
 			channel: payload.channel.id,
 			as_user: false,
@@ -585,7 +585,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 				user: userId,
 				channel: payload.channel.id
 			}
-			webClientBot.channels.invite(response)
+			webClientUser.channels.invite(response)
 				.then((res) => {
 					//Add what just happened to the history
 					addHistory(callback.callback_name, {
@@ -632,7 +632,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 
 		if (callback.update) {
 			// TODO - This should be a respond(), right?
-			webClientBot.chat.update(response)
+			webClientUser.chat.update(response)
 				.then((res) => {
 					//Add what just happened to the history
 					addHistory(callback.callback_name, {
@@ -648,7 +648,7 @@ exports.callbackMatch = (payload, respond, callback) => {
 				});
 		} else {
 			// TODO - This should be a respond(), right?
-			webClientBot.chat.postMessage(response)
+			webClientUser.chat.postMessage(response)
 				.then((res) => {
 					//Add what just happened to the history
 					addHistory(callback.callback_name, {
@@ -676,13 +676,13 @@ const deleteHistoryItem = (term) => {
 	} else {
 		async.each(message_history[term], function(historyItem, nextItem) {
 			if (historyItem.type === 'file') {
-				webClientBot.files.delete({
+				webClientUser.files.delete({
 					file: historyItem.ts
 				}).catch((err) => {
 					console.error('<Error><deleteHistoryItem><files.delete>', err);
 				});
 			} else if (historyItem.type === 'status') {
-				webClientBot.users.profile.set({
+				webClientUser.users.profile.set({
 					user: getUserId(historyItem.username),
 					profile: {
 						"status_text": "",
@@ -692,7 +692,7 @@ const deleteHistoryItem = (term) => {
 					console.error('<Error><deleteHistoryItem><users.profile.set>', err);
 				});
 			} else if (historyItem.type === 'invite') {
-				webClientBot.channels.kick({
+				webClientUser.channels.kick({
 					channel: historyItem.channel,
 					user: historyItem.user
 				}).catch((err) => {
@@ -700,7 +700,7 @@ const deleteHistoryItem = (term) => {
 				});
 			} else if (historyItem.type === 'reaction_trigger') {
 				console.log('<DEBUG><reaction trigger history delete> name:', historyItem.reaction, 'channel:', historyItem.channel, 'timestamp:', historyItem.ts);
-				webClientBot.reactions.remove({
+				webClientUser.reactions.remove({
 					name: historyItem.reaction,
 					channel: historyItem.channel,
 					timestamp: historyItem.ts
@@ -710,7 +710,7 @@ const deleteHistoryItem = (term) => {
 
 				});
 			} else if (!(historyItem.type === 'reaction') && !(historyItem.type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
-				webClientBot.chat.delete({
+				webClientUser.chat.delete({
 					channel: historyItem.channel,
 					ts: historyItem.ts
 				}).catch((err) => {
@@ -874,6 +874,7 @@ exports.adminCallback = (payload, respond, scriptConfig) => {
 			}
 		case 'Reload Config':
 			{
+				// calling this with nulls to use existing sheet values
 				scriptConfig.loadConfig().catch(console.error);
 
 				respond({
@@ -964,12 +965,12 @@ const deleteAllHistory = () => {
 // This is used with an event subscription to delete things that might not already be in the history
 exports.deleteItem = (channel, ts) => {
 	// Get a list of any thread replies to delete as well
-	webClientBot.channels.replies({
+	webClientUser.channels.replies({
 		channel: channel,
 		thread_ts: ts
 	}).then((res) => {
 		res.messages.forEach(function(message) {
-			webClientBot.chat.delete({
+			webClientUser.chat.delete({
 				channel: channel,
 				ts: message.ts
 			}).catch(console.error);
@@ -981,7 +982,7 @@ exports.deleteItem = (channel, ts) => {
 
 // Get the list of all users and their IDs and store it for faster caching
 const buildUserList = (authBotId) => {
-	webClientBot.users.list()
+	webClientUser.users.list()
 		.then((res) => {
 			user_list = res.members;
 		}).catch((err) => {
@@ -1000,7 +1001,7 @@ const getUserId = (name) => {
 
 // Get the list of all channels and their IDs and cache it
 const getChannelList = () => {
-	webClientBot.channels.list({
+	webClientUser.channels.list({
 			exclude_members: true,
 			exclude_archived: true,
 			get_private: true
@@ -1024,7 +1025,7 @@ const getChannelId = (name) => {
 
 // Invite a list of users to a channel
 const inviteUsersToChannel = (channelId, userIdList) => {
-	webClientBot.channels.invite({
+	webClientUser.channels.invite({
 		channel: channelId,
 		users: userIdList
 	}).catch((err) => {
@@ -1045,7 +1046,6 @@ const createChannels = (channelInfo) => {
 		console.log('<Debug> Getting ready to do the check for who to invite for channel', channel.name, 'with id', id);
 
 		if (channel.users === 'all') {
-			//		userIdsToInvite = allUserIds;
 
 			user_list.forEach(function(user) {
 				if (!(user.id === authBotId || user.id === 'USLACKBOT')) {
@@ -1066,7 +1066,7 @@ const createChannels = (channelInfo) => {
 		} else {
 			console.log('<DEBUG><Create Channels> Creating the new channel', channel.name);
 
-			webClientBot.channels.create({
+			webClientUser.channels.create({
 				name: channel.name
 			}).then((res) => {
 				//need to invite users to channel now
@@ -1074,7 +1074,7 @@ const createChannels = (channelInfo) => {
 				console.log('MEGA DEBUG trying to setPurpose for ', res.data.channel.id, ' do we havea purpose?', channel.purpose);
 
 				if (channel.purpose) {
-					webClientBot.channels.setPurpose({
+					webClientUser.channels.setPurpose({
 						channel: res.data.channel.id,
 						purpose: channel.purpose
 					}).then((res) => {
@@ -1094,7 +1094,11 @@ const createChannels = (channelInfo) => {
 
 // Do the initial work to make sure there's a valid connection, cache users and channels
 exports.validateBotConnection = () => {
-	webClientBot.auth.test()
+
+	// Let's try and set the right user's token
+	webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
+
+	webClientUser.auth.test()
 		.then((res) => {
 
 			console.log('<DEBUG>auth result is', res);
