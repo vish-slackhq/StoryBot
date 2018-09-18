@@ -74,6 +74,13 @@ exports.playbackScript = (config, tokens, event) => {
 				.then((res) => {
 					let apiMethod, target_ts, target_channel, params;
 
+					// check if the action has attachments, then check if the format needs to be cleaned up
+					if (action.attachments) {
+						// TODO: I'm sure I can do this more elegantly with a single regex
+						action.attachments = action.attachments.replace(/\{\n\"attachments\":/,'');
+						action.attachments = action.attachments.replace(/}$/, '');
+					}
+
 					// As long as we aren't in prototype mode, this is the real stuff
 					if (!(action.type === 'botuser')) {
 
@@ -159,52 +166,26 @@ exports.playbackScript = (config, tokens, event) => {
 										params.channel = event.channel;
 									}
 
-									if (!action.ephemeral) {
-
-										webClientBot.chat.postMessage(params)
-											.then((res) => {
-												//Add what just happened to the history
-												addHistory(trigger_term, {
-													item: action.item,
-													type: action.type,
-													channel: res.channel,
-													ts: res.ts
-												}).then((res) => {
-													//Allow the async series to go forward
-													nextItem();
-												}).catch((err) => {
-													console.error('<Error><Main Loop><addHistory>', err);
-													nextItem();
-												});
-											})
-											.catch((err) => {
-												console.error('<Error><Main Loop><chat.postMessage>', err);
-												nextItem();
-											});
-
-									} else {
-										params.user = event.user;
-										webClientBot.chat.postEphemeral(params)
-											.then((res) => {
-												//Add what just happened to the history
-												addHistory(trigger_term, {
-													item: action.item,
-													type: 'ephemeral',
-													channel: res.channel,
-													ts: res.message_ts
-												}).then((res) => {
-													//Allow the async series to go forward
-													nextItem();
-												}).catch((err) => {
-													console.error('<Error><Main Loop><addHistory>', err);
-													nextItem();
-												});
-											})
-											.catch((err) => {
-												console.error('<Error><Main Loop><chat.postEphemeral>', err);
-												nextItem();
-											});
-									}
+									webClientBot.chat.postMessage(params)
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											nextItem();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											nextItem();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postMessage>', err);
+										nextItem();
+									});
 									break;
 								}
 							case 'reaction':
@@ -238,7 +219,36 @@ exports.playbackScript = (config, tokens, event) => {
 									});
 									break;
 								}
-						
+							case 'ephemeral':
+								{
+									webClientBot.chat.postEphemeral({
+										user: event.user,
+										channel: event.channel,
+										as_user: false,
+										link_names: true,
+										attachments: action.attachments
+									})
+									.then((res) => {
+										//Add what just happened to the history
+										addHistory(trigger_term, {
+											item: action.item,
+											type: action.type,
+											channel: res.channel,
+											ts: res.message_ts
+										}).then((res) => {
+											//Allow the async series to go forward
+											nextItem();
+										}).catch((err) => {
+											console.error('<Error><Main Loop><addHistory>', err);
+											nextItem();
+										});
+									})
+									.catch((err) => {
+										console.error('<Error><Main Loop><chat.postEphemeral>', err);
+										nextItem();
+									});
+									break;
+								}
 							case 'file':
 								{
 									webClientBot.files.upload({
@@ -523,6 +533,13 @@ exports.callbackMatch = (payload, respond, callback) => {
 	let response = {
 		text: "default response"
 	};
+
+	// check if the callback has attachments, then check if the format needs to be cleaned up
+	if (callback.attachments) {
+		// TODO: I'm sure I can do this more elegantly with a single regex
+		callback.attachments = callback.attachments.replace(/\{\n\"attachments\":/,'');
+		callback.attachments = callback.attachments.replace(/}$/, '');
+	}
 
 
 	// Check for some of the options for a Callback - these can be combined together
