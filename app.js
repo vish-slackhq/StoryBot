@@ -225,6 +225,9 @@ app.post('/slack/commands', function(req, res) {
 				text: command + ' ' + args,
 				ts: 'slash',
 			};
+
+			// When matching a slash command, no need to delete the trigger as if it was a fake text command
+			scriptConfig.config[triggerKeys[indexMatch]][0].delete_trigger = null;
 			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, slash_event);
 		} else {
 			console.error('<Slash Command> No matching command');
