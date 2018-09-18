@@ -74,6 +74,26 @@ exports.playbackScript = (config, tokens, event) => {
 				.then((res) => {
 					let apiMethod, target_ts, target_channel, params;
 
+					// check if the action has attachments, then check if the format needs to be cleaned up
+					if (action.attachments) {
+						// TODO: I'm sure I can do this more elegantly with a single regex
+						action.attachments = action.attachments.replace(/\{\n\s*\"attachments\":/, '');
+						action.attachments = action.attachments.replace(/}$/, '');
+					}
+
+					// check if the action has a reaction, then check if the format needs to be cleaned up for the places where : isn't accepted
+					if (action.reaction) {
+						action.reaction = action.reaction.replace(/:/g, '');
+					}
+
+					// check if the action has an icon_emoji, then check if the format needs to be cleaned up for the places where : is required
+					if (action.icon_emoji) {
+						if (action.icon_emoji.match(/^(?!:).*(?!:)$/)) {
+							action.icon_emoji = ':' + action.icon_emoji + ':';
+						}
+					}
+
+
 					// As long as we aren't in prototype mode, this is the real stuff
 					if (!(action.type === 'botuser')) {
 
@@ -159,26 +179,50 @@ exports.playbackScript = (config, tokens, event) => {
 										params.channel = event.channel;
 									}
 
-									webClientBot.chat.postMessage(params)
-									.then((res) => {
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											nextItem();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											nextItem();
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><chat.postMessage>', err);
-										nextItem();
-									});
+									if (!action.ephemeral) {
+										webClientBot.chat.postMessage(params)
+											.then((res) => {
+												//Add what just happened to the history
+												addHistory(trigger_term, {
+													item: action.item,
+													type: action.type,
+													channel: res.channel,
+													ts: res.ts
+												}).then((res) => {
+													//Allow the async series to go forward
+													nextItem();
+												}).catch((err) => {
+													console.error('<Error><Main Loop><addHistory>', err);
+													nextItem();
+												});
+											})
+											.catch((err) => {
+												console.error('<Error><Main Loop><chat.postMessage>', err);
+												nextItem();
+											});
+									} else {
+										params.user = event.user;
+										webClientBot.chat.postEphemeral(params)
+											.then((res) => {
+												//Add what just happened to the history
+												addHistory(trigger_term, {
+													item: action.item,
+													type: 'ephemeral',
+													channel: res.channel,
+													ts: res.message_ts
+												}).then((res) => {
+													//Allow the async series to go forward
+													nextItem();
+												}).catch((err) => {
+													console.error('<Error><Main Loop><addHistory>', err);
+													nextItem();
+												});
+											})
+											.catch((err) => {
+												console.error('<Error><Main Loop><chat.postEphemeral>', err);
+												nextItem();
+											});
+									}
 									break;
 								}
 							case 'reaction':
@@ -208,36 +252,6 @@ exports.playbackScript = (config, tokens, event) => {
 									})
 									.catch((err) => {
 										console.error('<Error><Main Loop><reactions.add>', err);
-										nextItem();
-									});
-									break;
-								}
-							case 'ephemeral':
-								{
-									webClientBot.chat.postEphemeral({
-										user: event.user,
-										channel: event.channel,
-										as_user: false,
-										link_names: true,
-										attachments: action.attachments
-									})
-									.then((res) => {
-										//Add what just happened to the history
-										addHistory(trigger_term, {
-											item: action.item,
-											type: action.type,
-											channel: res.channel,
-											ts: res.message_ts
-										}).then((res) => {
-											//Allow the async series to go forward
-											nextItem();
-										}).catch((err) => {
-											console.error('<Error><Main Loop><addHistory>', err);
-											nextItem();
-										});
-									})
-									.catch((err) => {
-										console.error('<Error><Main Loop><chat.postEphemeral>', err);
 										nextItem();
 									});
 									break;
@@ -527,6 +541,13 @@ exports.callbackMatch = (payload, respond, callback) => {
 		text: "default response"
 	};
 
+	// check if the callback has attachments, then check if the format needs to be cleaned up
+	if (callback.attachments) {
+		// TODO: I'm sure I can do this more elegantly with a single regex
+		callback.attachments = callback.attachments.replace(/\{\n\s*\"attachments\":/, '');
+		callback.attachments = callback.attachments.replace(/}$/, '');
+	}
+
 
 	// Check for some of the options for a Callback - these can be combined together
 
@@ -584,6 +605,14 @@ exports.callbackMatch = (payload, respond, callback) => {
 
 	// If there are additional callback items to process, do them
 	if ((!callback.dialog && !callback.ephemeral && !callback.invite) || (callback.invite && callback.update)) {
+
+		// check if the callback has an icon_emoji, then check if the format needs to be cleaned up for the places where : is required
+		if (callback.icon_emoji) {
+			if (callback.icon_emoji.match(/^(?!:).*(?!:)$/)) {
+				callback.icon_emoji = ':' + callback.icon_emoji + ':';
+			}
+		}
+
 		response = {
 			channel: payload.channel.id,
 			text: callback.text,
