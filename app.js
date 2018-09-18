@@ -249,16 +249,9 @@ http.createServer(app).listen(port, () => {
 	storyBotTools.validateBotConnection();
 });
 
+//
 // Borrowed code to do case-insensitive Array.indexOf
-/**
- * Test for String equality ignoring case.
- * @param {String} str1
- * @param {String} str2
- * @returns {Boolean} true if both string is equals ignoring case.
- */
-function equalsIgnoreCase(str1, str2) {
-	return str1.toLowerCase() === str2.toLowerCase();
-}
+//
 
 /**
  * Find the index of a string in an array of string.
@@ -269,30 +262,10 @@ function equalsIgnoreCase(str1, str2) {
 function indexOfIgnoreCase(array, element) {
 	var ret = -1;
 	array.some(function(ele, index, array) {
-		if (equalsIgnoreCase(element, ele)) {
+		if (element.toLowerCase() === ele.toLowerCase()) {
 			ret = index;
 			return true;
 		}
 	});
 	return ret;
-}
-
-/**
- * Test the existence of a string in an array of string.
- * @param {Array} array
- * @param {String} element
- * @returns {Boolean} true if found and false if not found.
- */
-function existsIgnoreCase(array, element) {
-	return -1 !== indexOfIgnoreCase(array, element);
-}
-
-//convenience method
-Array.prototype.indexOfIgnoreCase = function(input) {
-	return indexOfIgnoreCase(this, input);
-};
-
-//convenience method
-Array.prototype.existsIgnoreCase = function(input) {
-	return -1 !== this.indexOfIgnoreCase(input);
 }
