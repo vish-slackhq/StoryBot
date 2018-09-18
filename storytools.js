@@ -778,6 +778,12 @@ exports.adminMenu = (body) => {
 			type: 'button',
 			style: 'default',
 			value: 'Create Channels'
+		}, {
+			name: 'Config',
+			text: 'Config',
+			type: 'button',
+			style: 'default',
+			value: 'Config'
 		}]
 	}];
 
@@ -793,8 +799,41 @@ exports.adminMenu = (body) => {
 }
 
 // Handle the admin menu callbacks
-exports.adminCallback = (payload, respond) => {
+exports.adminCallback = (payload, respond, scriptConfig) => {
+	console.log('<DEBUG><adminCallback> called with payload.actions[0].value:', payload.actions[0].value);
 	switch (payload.actions[0].value) {
+		case 'Triggers':
+			{
+				let triggerKeys = Object.keys(scriptConfig.config);
+
+				if (triggerKeys.length > 0) {
+					let attachments = [];
+					let key_list = ""
+					triggerKeys.forEach(function(key) {
+						if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks')) {
+							key_list = key_list + " \`" + key + "\`";
+						}
+					});
+
+					attachments.push({
+						fields: [{
+							value: key_list,
+							short: false
+						}],
+						title: "These are the triggers for the story:",
+						mrkdwn_in: ['text', 'fields']
+					});
+
+					respond({
+						response_type: 'ephemeral',
+						replace_original: true,
+						attachments: attachments
+					}).catch((err) => {
+						console.error('<Error><Admin Menu><Triggers>', err);
+					});
+				}
+				break;
+			}
 		case 'History':
 			{
 				console.log('<Admin Menu> History is:', message_history);
@@ -833,6 +872,19 @@ exports.adminCallback = (payload, respond) => {
 				}
 				break;
 			}
+		case 'Reload Config':
+			{
+				scriptConfig.loadConfig().catch(console.error);
+
+				respond({
+					text: "OK! I'm re-loading!",
+					response_type: 'ephemeral',
+					replace_original: true
+				}).catch((err) => {
+					console.error('<Error><Admin Menu><Reload Config>', err);
+				});
+				break;
+			}
 		case 'Cleanup All':
 			{
 				let msg = deleteAllHistory();
@@ -841,6 +893,20 @@ exports.adminCallback = (payload, respond) => {
 					replace_original: true,
 					ephemeral: true
 				};
+				break;
+			}
+		case 'Create Channels':
+			{
+				console.log('<Debug><Creating Channels>');
+				createChannels(scriptConfig.config.Channels);
+
+				respond({
+					text: "Creating channels now",
+					response_type: 'ephemeral',
+					replace_original: true
+				}).catch((err) => {
+					console.error('<Error><Admin Menu><Create Channels>', err);
+				});
 				break;
 			}
 		default:
@@ -967,7 +1033,7 @@ const inviteUsersToChannel = (channelId, userIdList) => {
 }
 
 // Create channels from the config info
-exports.createChannels = (channelInfo) => {
+const createChannels = (channelInfo) => {
 	console.log('<Debug><Create Channels> Creating channels now for', channelInfo);
 
 	channelInfo.forEach(function(channel) {

@@ -17,12 +17,8 @@ require('dotenv').config({
 
 // Load the appropriate config file from Google Sheets
 var scriptConfig = require('./load-conf-google');
-var triggerKeys = [];
 
-scriptConfig.loadConfig().then((result) => {
-	triggerKeys = Object.keys(result);
-	console.log('<Loading> Loaded config for keys:', triggerKeys);
-});
+scriptConfig.loadConfig().catch(console.error);
 
 // Express app server
 const http = require('http');
@@ -59,9 +55,9 @@ slackEvents.on('message', (event) => {
 	// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
 	if (event.type === 'message' && !event.subtype && !event.bot_id) {
 		// Matched a trigger from a user so playback the story
-		let indexMatch = indexOfIgnoreCase(triggerKeys, event.text);
+		let indexMatch = indexOfIgnoreCase(scriptConfig.triggerKeys, event.text);
 		if (indexMatch >= 0) {
-			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, event);
+			storyBotTools.playbackScript(scriptConfig.config[scriptConfig.triggerKeys[indexMatch]], scriptConfig.config.Tokens, event);
 		}
 	}
 });
@@ -74,7 +70,7 @@ slackEvents.on('reaction_added', (event) => {
 	} else {
 		// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
 		// Use a unique reacji vs one being used elsewhere in the scripts
-		if (triggerKeys.indexOf(':' + event.reaction + ':') >= 0) {
+		if (scriptConfig.triggerKeys.indexOf(':' + event.reaction + ':') >= 0) {
 			// Need to pass some basic event details to mimic what happens with a real event
 			let reaction_event = {
 				channel: event.item.channel,
@@ -92,74 +88,7 @@ slackEvents.on('error', console.error);
 
 // Our special callback menu
 slackInteractions.action('callback_admin_menu', (payload, respond) => {
-	switch (payload.actions[0].value) {
-		case 'Triggers':
-			{
-				if (triggerKeys.length > 0) {
-					let attachments = [];
-					let key_list = ""
-					triggerKeys.forEach(function(key) {
-						if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks')) {
-							key_list = key_list + " \`" + key + "\`";
-						}
-					});
-
-					attachments.push({
-						fields: [{
-							value: key_list,
-							short: false
-						}],
-						title: "These are the triggers for the story:",
-						mrkdwn_in: ['text', 'fields']
-					});
-
-					respond({
-						response_type: 'ephemeral',
-						replace_original: true,
-						attachments: attachments
-					}).catch((err) => {
-						console.error('<Error><Admin Menu><Triggers>', err);
-					});
-				}
-				break;
-			}
-		case 'Reload Config':
-			{
-				scriptConfig.loadConfig().then((result) => {
-					triggerKeys = Object.keys(result);
-					console.log('<Re-Loading>re-validating Bot Connection / building channel list');
-					storyBotTools.validateBotConnection();
-				});
-
-				respond({
-					text: "OK! I'm re-loading!",
-					response_type: 'ephemeral',
-					replace_original: true
-				}).catch((err) => {
-					console.error('<Error><Admin Menu><Reload Config>', err);
-				});
-				break;
-			}
-		case 'Create Channels':
-			{
-				console.log('<Debug><Creating Channels>');
-				storyBotTools.createChannels(scriptConfig.config.Channels);
-
-				respond({
-					text: "Creating channels now",
-					response_type: 'ephemeral',
-					replace_original: true
-				}).catch((err) => {
-					console.error('<Error><Admin Menu><Create Channels>', err);
-				});
-				break;
-			}
-		default:
-			{
-				storyBotTools.adminCallback(payload, respond);
-				break;
-			}
-	}
+	storyBotTools.adminCallback(payload, respond, scriptConfig);
 });
 
 // Deal with the history cleanup
@@ -216,7 +145,7 @@ app.post('/slack/commands', function(req, res) {
 		storyBotTools.adminMenu(req.body);
 	} else {
 		// Look if there's a trigger for a fake slash command and use it with a real slash command!
-		let indexMatch = indexOfIgnoreCase(triggerKeys, command + ' ' + args);
+		let indexMatch = indexOfIgnoreCase(scriptConfig.triggerKeys, command + ' ' + args);
 
 		if (indexMatch >= 0) {
 			let slash_event = {
@@ -227,8 +156,8 @@ app.post('/slack/commands', function(req, res) {
 			};
 
 			// When matching a slash command, no need to delete the trigger as if it was a fake text command
-			scriptConfig.config[triggerKeys[indexMatch]][0].delete_trigger = null;
-			storyBotTools.playbackScript(scriptConfig.config[triggerKeys[indexMatch]], scriptConfig.config.Tokens, slash_event);
+			scriptConfig.config[scriptConfig.triggerKeys[indexMatch]][0].delete_trigger = null;
+			storyBotTools.playbackScript(scriptConfig.config[scriptConfig.triggerKeys[indexMatch]], scriptConfig.config.Tokens, slash_event);
 		} else {
 			console.error('<Slash Command> No matching command');
 		}
