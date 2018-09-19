@@ -201,7 +201,7 @@ app.post('/slack/commands', function(req, res) {
 	// Check if the requesting team / user is already in the DB
 	redis.get(req.body.team_id).then((auth) => {
 		//console.log('<DEBUG><oAuth><slash handler> team_id lookup result is', auth);
-		if (command === '/storybot') {
+		if (command === '/storybot' || command === '/devstorybot') {
 			storyBotTools.adminMenu(req.body);
 		} else {
 			let config = configTools.getConfig(auth.team_id);
@@ -227,70 +227,59 @@ app.post('/slack/commands', function(req, res) {
 // OAuth Handler - this URL is connected through https://myURL/intstall in the Oauth and Permissions page
 // Usually the URL is your ngrok redirect until the app gets moved to where ever you would like to host it!
 app.get('/install', (req, res) => {
-			if (req.query.code) {
-				console.log('<oAUTH><INSTALL> CODE is ', req.query);
-				let redirect = team => res.redirect(team.url)
-				//Storing the team ID in redis so we can verify the app by team token
-				//key value pair - team id, auth snippet
-				let setAuth = auth => redis.set(auth.team_id, auth)
-				let testAuth = auth => //{
-					//			webClientAuth.auth.test({
-					//				token: auth.access_token
-					//			});
-					axios.post('https://slack.com/api/auth.test', qs.stringify({
-						token: auth.access_token
-					}));
-				/*	}).then((res) => {
-						console.log('<Loading> Bot connected to workspace', res.team);
-						return res;
-					}).catch(console.error);*/
-				//	}
-				let args = {
-					client_id: process.env.SLACK_CLIENT_ID,
-					client_secret: process.env.SLACK_CLIENT_SECRET,
-					code: req.query.code
-				}
-				//	webClientAuth.oauth.access(args).then(setAuth).then(testAuth).then(redirect);
-				axios.post('https://slack.com/api/oauth.access', qs.stringify(args)).then(setAuth).then(testAuth).then(redirect);
-
-				}
-				else {
-					res.redirect("https://slack.com/oauth/authorize?" + qs.stringify({
-						client_id: process.env.SLACK_CLIENT_ID,
-						scope: process.env.SLACK_SCOPE
-					}));
-				}
-			})
-
-		// The main site
-		app.get('/', (req, res) => {
-			res.send('<h2>StoryBot is running</h2>');
-		});
-
-		// Select a port for the server to listen on.
-		const port = process.env.PORT || 3000; console.log('PORT?', port);
-		// Start the express application server
-		http.createServer(app).listen(port, () => {
-			console.log(`<Startup> server listening on port ${port}`);
-		});
-
-		//
-		// Borrowed code to do case-insensitive Array.indexOf
-		//
-
-		/**
-		 * Find the index of a string in an array of string.
-		 * @param {Array} array
-		 * @param {String} element
-		 * @returns {Number} the index of the element in the array or -1 if not found.
-		 */
-		function indexOfIgnoreCase(array, element) {
-			let ret = -1;
-			array.some(function(ele, index, array) {
-				if (element.toLowerCase() === ele.toLowerCase()) {
-					ret = index;
-					return true;
-				}
-			});
-			return ret;
+	if (req.query.code) {
+		console.log('<oAUTH><INSTALL> CODE is ', req.query);
+		let redirect = team => res.redirect(team.data.url)
+		//Storing the team ID in redis so we can verify the app by team token
+		//key value pair - team id, auth snippet
+		let setAuth = auth => redis.set(auth.data.team_id, auth.data)
+		let testAuth = auth => //{
+			axios.post('https://slack.com/api/auth.test', qs.stringify({
+				token: auth.access_token
+			}));
+		let args = {
+			client_id: process.env.SLACK_CLIENT_ID,
+			client_secret: process.env.SLACK_CLIENT_SECRET,
+			code: req.query.code
 		}
+		axios.post('https://slack.com/api/oauth.access', qs.stringify(args)).then(setAuth).then(testAuth).then(redirect);
+	} else {
+		res.redirect("https://slack.com/oauth/authorize?" + qs.stringify({
+			client_id: process.env.SLACK_CLIENT_ID,
+			scope: process.env.SLACK_SCOPE
+		}));
+	}
+})
+
+// The main site
+app.get('/', (req, res) => {
+	res.send('<h2>StoryBot is running</h2>');
+});
+
+// Select a port for the server to listen on.
+const port = process.env.PORT || 3000;
+// Start the express application server
+http.createServer(app).listen(port, () => {
+	console.log(`<Startup> server listening on port ${port}`);
+});
+
+//
+// Borrowed code to do case-insensitive Array.indexOf
+//
+
+/**
+ * Find the index of a string in an array of string.
+ * @param {Array} array
+ * @param {String} element
+ * @returns {Number} the index of the element in the array or -1 if not found.
+ */
+function indexOfIgnoreCase(array, element) {
+	let ret = -1;
+	array.some(function(ele, index, array) {
+		if (element.toLowerCase() === ele.toLowerCase()) {
+			ret = index;
+			return true;
+		}
+	});
+	return ret;
+}
