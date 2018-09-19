@@ -4,6 +4,8 @@ const async = require("async");
 // Need this for shared message due to no SDK suppport
 const qs = require('querystring');
 const axios = require('axios');
+// Fun with oAuth
+redis = require('./redis');
 
 // Webhooks for slash command response
 const {
@@ -15,7 +17,8 @@ const {
 	WebClient
 } = require('@slack/client');
 // Let's try this - empty WebClient for global, will be set on bot startup with the right user token
-var webClientUser = null;
+//var webClientUser = null;
+var webClientArray = [];
 
 // TODO: figure out this whole token mess
 //const webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
@@ -27,7 +30,11 @@ var channel_list = []; // cached channel list for quicker lookups
 
 // The main function that plays back a given trigger once it's matched
 // Takes the config for the specific trigger we are playing back, list of user tokens, and event data
-exports.playbackScript = (config, tokens, event) => {
+exports.playbackScript = (access_token, config, tokens, event) => {
+
+	// Get the Slack Web API client for the user's token
+	let webClientUser = getWebClient(access_token);
+
 	// Form the string for unique message_history entry
 	const trigger_term = event.text + "-" + event.ts;
 	console.log('<DEBUG><playbackScript> Starting playback for', trigger_term);
@@ -62,6 +69,7 @@ exports.playbackScript = (config, tokens, event) => {
 			//Clean up a fake slash command or other item that has `delete_trigger` set
 			if (action.delete_trigger) {
 				webClientUser.chat.delete({
+					//		webClientArray
 					channel: event.channel,
 					ts: event.ts
 				}).catch((err) => {
@@ -534,7 +542,10 @@ exports.playbackScript = (config, tokens, event) => {
 }
 
 // Process a match from the dynamic callback sheet
-exports.callbackMatch = (payload, respond, callback) => {
+exports.callbackMatch = (access_token, payload, respond, callback) => {
+	// Get the Slack Web API client for the user's token
+	let webClientUser = getWebClient(access_token);
+
 	console.log('<DEBUG><callbackMatch> Starting callback match for', callback.callback_name);
 
 	let response = {
@@ -668,7 +679,11 @@ exports.callbackMatch = (payload, respond, callback) => {
 }
 
 // Delete something from the history
-const deleteHistoryItem = (term) => {
+const deleteHistoryItem = (access_token, term) => {
+
+	// Get the Slack Web API client for the user's token
+	let webClientUser = getWebClient(access_token);
+
 	if (!message_history[term]) {
 		console.log('<Error><deleteHistoryItem> Well this is embarassing:' + term + "doesn't exist in history");
 		// Send this back to format an in-Slack message
@@ -799,7 +814,7 @@ exports.adminMenu = (body) => {
 }
 
 // Handle the admin menu callbacks
-exports.adminCallback = (payload, respond, scriptConfig) => {
+exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 	console.log('<DEBUG><adminCallback> called with payload.actions[0].value:', payload.actions[0].value);
 	switch (payload.actions[0].value) {
 		case 'Triggers':
@@ -837,6 +852,12 @@ exports.adminCallback = (payload, respond, scriptConfig) => {
 		case 'History':
 			{
 				console.log('<Admin Menu> History is:', message_history);
+				let response = {
+					response_type: 'ephemeral',
+					replace_original: true,
+					text: "No history right now"
+				}
+
 				let message_history_keys = Object.keys(message_history);
 
 				if (message_history_keys.length > 0) {
@@ -863,13 +884,11 @@ exports.adminCallback = (payload, respond, scriptConfig) => {
 						replace_original: true,
 						attachments: attachments
 					};
-				} else {
-					response = {
-						response_type: 'ephemeral',
-						replace_original: true,
-						text: "No history right now"
-					}
 				}
+
+				respond(response).catch((err) => {
+					console.error('<Error><Admin Menu><History>', err);
+				});
 				break;
 			}
 		case 'Reload Config':
@@ -888,18 +907,20 @@ exports.adminCallback = (payload, respond, scriptConfig) => {
 			}
 		case 'Cleanup All':
 			{
-				let msg = deleteAllHistory();
-				response = {
+				let msg = deleteAllHistory(access_token);
+				respond({
 					text: msg,
 					replace_original: true,
 					ephemeral: true
-				};
+				}).catch((err) => {
+					console.error('<Error><Admin Menu><Cleanup All>', err);
+				});
 				break;
 			}
 		case 'Create Channels':
 			{
 				console.log('<Debug><Creating Channels>');
-				createChannels(scriptConfig.config.Channels);
+				createChannels(access_token, scriptConfig.config.Channels);
 
 				respond({
 					text: "Creating channels now",
@@ -912,11 +933,13 @@ exports.adminCallback = (payload, respond, scriptConfig) => {
 			}
 		default:
 			{
-				response = {
+				respond({
 					text: ":thinking_face: Not sure how that happened",
 					replace_original: true,
 					ephemeral: true
-				};
+				}).catch((err) => {
+					console.error('<Error><Admin Menu><Default>', err);
+				});
 				break;
 			}
 	}
@@ -947,7 +970,7 @@ const addHistory = (name, data) => {
 }
 
 // Burn it all down
-const deleteAllHistory = () => {
+const deleteAllHistory = (access_token) => {
 	let historyKeys = Object.keys(message_history);
 	//	console.log('<DEBUG> Time to delete all history with keys', historyKeys);
 	if (!(historyKeys.length > 0)) {
@@ -955,7 +978,7 @@ const deleteAllHistory = () => {
 		return "No history to delete!";
 	} else {
 		historyKeys.forEach(function(key) {
-			deleteHistoryItem(key);
+			deleteHistoryItem(access_token, key);
 		});
 		return "All history deleted";
 	}
@@ -963,7 +986,11 @@ const deleteAllHistory = () => {
 
 // Delete a message (or, if it's the first message in a thread, delete the whole thread)
 // This is used with an event subscription to delete things that might not already be in the history
-exports.deleteItem = (channel, ts) => {
+exports.deleteItem = (access_token, channel, ts) => {
+
+	// Get the Slack Web API client for the user's token
+	let webClientUser = getWebClient(access_token);
+
 	// Get a list of any thread replies to delete as well
 	webClientUser.channels.replies({
 		channel: channel,
@@ -981,8 +1008,8 @@ exports.deleteItem = (channel, ts) => {
 }
 
 // Get the list of all users and their IDs and store it for faster caching
-const buildUserList = (authBotId) => {
-	webClientUser.users.list()
+const buildUserList = (webClientBot) => {
+	webClientBot.users.list()
 		.then((res) => {
 			user_list = res.members;
 		}).catch((err) => {
@@ -1000,8 +1027,8 @@ const getUserId = (name) => {
 }
 
 // Get the list of all channels and their IDs and cache it
-const getChannelList = () => {
-	webClientUser.channels.list({
+const getChannelList = (webClientBot) => {
+	webClientBot.channels.list({
 			exclude_members: true,
 			exclude_archived: true,
 			get_private: true
@@ -1092,13 +1119,24 @@ const createChannels = (channelInfo) => {
 	});
 }
 
+// Clean up the history when a specific history term is being cleaned
+exports.historyCleanup = (access_token, payload, respond) => {
+	let msg = deleteHistoryItem(access_token, payload.actions[0].value);
+
+	response = {
+		text: msg,
+		replace_original: true,
+		ephemeral: true
+	};
+	respond(response).catch(console.error);
+}
+
 // Do the initial work to make sure there's a valid connection, cache users and channels
 exports.validateBotConnection = () => {
-
 	// Let's try and set the right user's token
-	webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
+	webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
 
-	webClientUser.auth.test()
+	webClientBot.auth.test()
 		.then((res) => {
 
 			console.log('<DEBUG>auth result is', res);
@@ -1110,22 +1148,21 @@ exports.validateBotConnection = () => {
 
 			// Cache info on the users for ID translation and inviting to channels
 			// TODO - make this the bot's ID so it's excluded?
-			buildUserList(user_id);
-			getChannelList();
+			buildUserList(webClientBot);
+			getChannelList(webClientBot);
 		})
 		.catch((err) => {
 			console.error('<Error><validateBotConnection><auth.test>', err);
 		});
 }
 
-// Clean up the history when a specific history term is being cleaned
-exports.historyCleanup = (payload, respond) => {
-	let msg = deleteHistoryItem(payload.actions[0].value);
-
-	response = {
-		text: msg,
-		replace_original: true,
-		ephemeral: true
-	};
-	respond(response).catch(console.error);
+const getWebClient = (token) => {
+	console.log('<WEB CLIENT> Request for token', token);
+	if (!webClientArray[token]) {
+		console.log('<WEB CLIENT> Creating a new client:');
+		webClientArray[token] = new WebClient(token);
+	} else {
+		console.log('<WEB CLIENT> Found an existing client');
+	}
+	return webClientArray[token];
 }

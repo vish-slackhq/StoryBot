@@ -15,6 +15,9 @@ require('dotenv').config({
 	path: `${config_file}`
 });
 
+// Fun with oAuth
+redis = require('./redis');
+
 // Load the appropriate config file from Google Sheets
 var scriptConfig = require('./load-conf-google');
 
@@ -41,7 +44,9 @@ const {
 
 // Create the adapter using the app's verification token, read from environment variable
 const slackInteractions = createMessageAdapter(process.env.SLACK_SIGNING_SECRET);
-const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET);
+const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET, {
+	includeBody: true
+});
 
 // Initialize an Express application
 // NOTE: You must use a body parser for the urlencoded format before attaching the adapter
@@ -56,57 +61,61 @@ app.use('/slack/events', slackEvents.expressMiddleware());
 const storyBotTools = require('./storytools.js');
 
 // Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
-slackEvents.on('message', (event) => {
-	// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
-	// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
-	if (event.type === 'message' && !event.subtype && !event.bot_id) {
-		// Matched a trigger from a user so playback the story
-		let indexMatch = indexOfIgnoreCase(scriptConfig.triggerKeys, event.text);
-		if (indexMatch >= 0) {
-			storyBotTools.playbackScript(scriptConfig.config[scriptConfig.triggerKeys[indexMatch]], scriptConfig.config.Tokens, event);
+slackEvents.on('message', (event, body) => {
+	redis.get(body.team_id).then((res) => {
+		// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
+		// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
+		if (event.type === 'message' && !event.subtype && !event.bot_id) {
+			// Matched a trigger from a user so playback the story
+			let indexMatch = indexOfIgnoreCase(scriptConfig.triggerKeys, event.text);
+			if (indexMatch >= 0) {
+				storyBotTools.playbackScript(res.access_token, scriptConfig.config[scriptConfig.triggerKeys[indexMatch]], scriptConfig.config.Tokens, event);
+			}
 		}
-	}
+	}).catch(console.error);
 });
 
 // Listen for reaction_added event
-slackEvents.on('reaction_added', (event) => {
-	// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
-	if (event.reaction === 'skull') {
-		storyBotTools.deleteItem(event.item.channel, event.item.ts);
-	} else {
-		// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
-		// Use a unique reacji vs one being used elsewhere in the scripts
-		if (scriptConfig.triggerKeys.indexOf(':' + event.reaction + ':') >= 0) {
-			// Need to pass some basic event details to mimic what happens with a real event
-			let reaction_event = {
-				channel: event.item.channel,
-				ts: event.item.ts,
-				text: ':' + event.reaction + ':',
-				reaction: event.reaction
-			};
-			storyBotTools.playbackScript(scriptConfig.config[reaction_event.text], scriptConfig.config.Tokens, reaction_event);
+slackEvents.on('reaction_added', (event, body) => {
+	redis.get(body.team_id).then((res) => {
+		// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
+		if (event.reaction === 'skull') {
+			storyBotTools.deleteItem(res.access_token, event.item.channel, event.item.ts);
+		} else {
+			// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
+			// Use a unique reacji vs one being used elsewhere in the scripts
+			if (scriptConfig.triggerKeys.indexOf(':' + event.reaction + ':') >= 0) {
+				// Need to pass some basic event details to mimic what happens with a real event
+				let reaction_event = {
+					channel: event.item.channel,
+					ts: event.item.ts,
+					text: ':' + event.reaction + ':',
+					reaction: event.reaction
+				};
+				storyBotTools.playbackScript(res.access_token, scriptConfig.config[reaction_event.text], scriptConfig.config.Tokens, reaction_event);
+			}
 		}
-	}
+	}).catch(console.error);
 });
 
 // Handle errors (see `errorCodes` export)
 slackEvents.on('error', console.error);
 
-// Our special callback menu
-slackInteractions.action('callback_admin_menu', (payload, respond) => {
-	storyBotTools.adminCallback(payload, respond, scriptConfig);
-});
-
-// Deal with the history cleanup
-slackInteractions.action('callback_history_cleanup', storyBotTools.historyCleanup);
-
 // Look for matches for dynamic callbacks
 slackInteractions.action(/callback_/, (payload, respond) => {
-	if (scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id)) {
-		storyBotTools.callbackMatch(payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
-	} else {
-		console.log('<Callback> No match in the config for', payload.callback_id);
-	}
+	redis.get(payload.team.id).then((res) => {
+		if (payload.callback_id === 'callback_history_cleanup') {
+			storyBotTools.historyCleanup(res.access_token, payload, respond);
+		} else if (payload.callback_id === 'callback_admin_menu') {
+			storyBotTools.adminCallback(res.access_token, payload, respond, scriptConfig);
+		} else {
+			if (scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id)) {
+				storyBotTools.callbackMatch(res.access_token, payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
+			} else {
+				console.log('<Callback> No match in the config for', payload.callback_id);
+			}
+		}
+	}).catch(console.error);
 });
 
 // 
@@ -128,6 +137,7 @@ app.use(bodyParser.json());
 app.post('/slack/commands', function(req, res) {
 	// respond immediately!
 	res.status(200).end();
+
 	let command = req.body.command;
 	let args = req.body.text;
 	const timeStamp = req.headers['x-slack-request-timestamp'];
@@ -147,31 +157,37 @@ app.post('/slack/commands', function(req, res) {
          Actual: ${slashSig}`);
 	}
 
-	if (command === '/storybot') {
-		storyBotTools.adminMenu(req.body);
-	} else {
-		// Look if there's a trigger for a fake slash command and use it with a real slash command!
-		let indexMatch = indexOfIgnoreCase(scriptConfig.triggerKeys, command + ' ' + args);
+	console.log('<DEBUG><oAuth><slash handler> request is', req.body);
 
-		if (indexMatch >= 0) {
-			let slash_event = {
-				user: req.body.user_id,
-				channel: req.body.channel_id,
-				text: command + ' ' + args,
-				ts: 'slash',
-			};
+	// Check if the requesting team / user is already in the DB
+	redis.get(req.body.team_id).then((res) => {
+		console.log('<DEBUG><oAuth><slash handler> team_id lookup result is', res);
 
-			// When matching a slash command, no need to delete the trigger as if it was a fake text command
-			scriptConfig.config[scriptConfig.triggerKeys[indexMatch]][0].delete_trigger = null;
-			storyBotTools.playbackScript(scriptConfig.config[scriptConfig.triggerKeys[indexMatch]], scriptConfig.config.Tokens, slash_event);
+		if (command === '/storybot') {
+			storyBotTools.adminMenu(req.body);
 		} else {
-			console.error('<Slash Command> No matching command');
+			// Look if there's a trigger for a fake slash command and use it with a real slash command!
+			let indexMatch = indexOfIgnoreCase(scriptConfig.triggerKeys, command + ' ' + args);
+
+			if (indexMatch >= 0) {
+				let slash_event = {
+					user: req.body.user_id,
+					channel: req.body.channel_id,
+					text: command + ' ' + args,
+					ts: 'slash',
+				};
+
+				// When matching a slash command, no need to delete the trigger as if it was a fake text command
+				scriptConfig.config[scriptConfig.triggerKeys[indexMatch]][0].delete_trigger = null;
+				storyBotTools.playbackScript(res.access_token, scriptConfig.config[scriptConfig.triggerKeys[indexMatch]], scriptConfig.config.Tokens, slash_event);
+			} else {
+				console.error('<Slash Command> No matching command');
+			}
 		}
-	}
+	}).catch(console.error);
 });
 
-// Fun with oAuth
-redis = require('./redis');
+
 // Create a new web client
 const {
 	WebClient
