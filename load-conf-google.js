@@ -5,7 +5,8 @@
 */
 
 const extractGSheet = require('spreadsheet-to-json');
-require('dotenv').config();
+// Fun with oAuth
+redis = require('./redis');
 
 var allConfigs = [];
 
@@ -32,7 +33,7 @@ exports.getConfig = (team_id) => {
 
 // Load config
 exports.loadConfig = (team_id) => {
-  console.log('<DEBUG><Config><loadConfig> Loading for team',team_id, 'with googleData:', allConfigs[team_id].googleData);
+  // console.log('<DEBUG><Config><loadConfig> Loading for team',team_id, 'with googleData:', allConfigs[team_id].googleData);
   return new Promise((resolve) => {
     extractGSheet.extractSheets({
       // your google spreadhsheet key 
@@ -49,12 +50,12 @@ exports.loadConfig = (team_id) => {
       if (err) {
         console.log(err);
       }
-   //   exports.config = data;
-   //   exports.triggerKeys = Object.keys(data);
-//      console.log('<Loading> Loaded config for keys:', exports.triggerKeys);
-allConfigs[team_id].scripts = data;
-allConfigs[team_id].keys = Object.keys(allConfigs[team_id].scripts);
-console.log('<Loading> Loaded config for keys:',allConfigs[team_id].keys);
+      //   exports.config = data;
+      //   exports.triggerKeys = Object.keys(data);
+      //      console.log('<Loading> Loaded config for keys:', exports.triggerKeys);
+      allConfigs[team_id].scripts = data;
+      allConfigs[team_id].keys = Object.keys(allConfigs[team_id].scripts);
+      console.log('<Loading> Loaded config for team', team_id, 'with keys:', allConfigs[team_id].keys);
       resolve(data);
     });
   })

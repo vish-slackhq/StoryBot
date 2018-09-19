@@ -24,16 +24,18 @@ var webClientArray = [];
 //const webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
 
 // Global variables - way to not need these?
+// TODO - now that we pass in the config to playback, keep each sessions history and caches under their config!
 var message_history = []; // maintains the running session history, used for deletes and reply/reaction targets
 var user_list = []; // cached user list for quicker lookups
 var channel_list = []; // cached channel list for quicker lookups
 
 // The main function that plays back a given trigger once it's matched
 // Takes the config for the specific trigger we are playing back, list of user tokens, and event data
-exports.playbackScript = (access_token, config, tokens, event) => {
-
+exports.playbackScript = (access_token, config, term, event) => {
 	// Get the Slack Web API client for the user's token
 	let webClientUser = getWebClient(access_token);
+
+	let tokens = config.scripts.Tokens;
 
 	// Form the string for unique message_history entry
 	const trigger_term = event.text + "-" + event.ts;
@@ -49,7 +51,7 @@ exports.playbackScript = (access_token, config, tokens, event) => {
 			reaction: event.reaction
 		});
 		// TODO - what is this doing, are we sure we want to delete the triggering item in these cases?
-	} else if (!config[0].delete_trigger && !(config[0].type == 'reply' && config[0].target_item === 'trigger')) {
+	} else if (!config.scripts[term][0].delete_trigger && !(config.scripts[term][0].type == 'reply' && config.scripts[term][0].target_item === 'trigger')) {
 
 		// Make it easy to cleanup the trigger term
 		addHistory(trigger_term, {
@@ -61,7 +63,7 @@ exports.playbackScript = (access_token, config, tokens, event) => {
 	}
 
 	// Step through the trigger's script in the specified order
-	async.eachSeries(config, function(action, nextItem) {
+	async.eachSeries(config.scripts[term], function(action, nextItem) {
 
 		// Ignore blank lines that may have been ingested for some reason 
 		if (action.type) {
@@ -814,12 +816,12 @@ exports.adminMenu = (body) => {
 }
 
 // Handle the admin menu callbacks
-exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
+exports.adminCallback = (access_token, payload, respond, configTools) => {
 	console.log('<DEBUG><adminCallback> called with payload.actions[0].value:', payload);
 	switch (payload.actions[0].value) {
 		case 'Triggers':
 			{
-				let triggerKeys = scriptConfig.getConfig(payload.team.id).keys;
+				let triggerKeys = configTools.getConfig(payload.team.id).keys;
 
 				if (triggerKeys.length > 0) {
 					let attachments = [];
@@ -894,7 +896,7 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 		case 'Reload Config':
 			{
 				// calling this with nulls to use existing sheet values
-				scriptConfig.loadConfig(payload.team.id).catch(console.error);
+				configTools.loadConfig(payload.team.id).catch(console.error);
 
 				respond({
 					text: "OK! I'm re-loading!",
@@ -923,10 +925,12 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 				let webClientUser = getWebClient(access_token);
 
 				// TODO janky, fix eventually
-				console.log('payload.team.id:',payload.team.id);
-				let config = scriptConfig.getConfig(payload.team.id);
-			
-				let gsheetID = '', clientEmail = '', privateKey = '';
+				console.log('payload.team.id:', payload.team.id);
+				let config = configTools.getConfig(payload.team.id);
+
+				let gsheetID = '',
+					clientEmail = '',
+					privateKey = '';
 				if (config) {
 					gsheetID = config.googleData.gsheetID;
 					clientEmail = config.googleData.clientEmail;
@@ -982,7 +986,7 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 		case 'Create Channels':
 			{
 				console.log('<Debug><Creating Channels>');
-				createChannels(access_token, scriptConfig.getConfig(payload.team.id).script.Channels);
+				createChannels(access_token, configTools.getConfig(payload.team.id).script.Channels);
 
 				respond({
 					text: "Creating channels now",
@@ -1074,6 +1078,7 @@ const buildUserList = (webClientBot) => {
 	webClientBot.users.list()
 		.then((res) => {
 			user_list = res.members;
+	//		console.log('debug user list:',user_list);
 		}).catch((err) => {
 			console.error('<Error><buildUserList><users.list>', err);
 		});
@@ -1097,6 +1102,7 @@ const getChannelList = (webClientBot) => {
 		})
 		.then((res) => {
 			channel_list = res.channels;
+	//		console.log('debug channel list:',channel_list);
 		})
 		.catch((err) => {
 			console.error('<Error><getChannelListm><channels.list>', err);
@@ -1218,13 +1224,13 @@ exports.validateBotConnection = () => {
 }
 
 // Do the initial work to make sure there's a valid connection, cache users and channels
-exports.setupNewConfig = () => {
-	// Start up with the Bot's token
-	let webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
-
-	webClientBot.auth.test()
+exports.setupNewConfig = (team_id) => {
+	// Get the Slack Web API client for the user's token
+	let webClientUser = getWebClient(team_id);
+console.log('WSETUPNEWCONFIG web client is',webClientUser);
+	webClientUser.auth.test()
 		.then((res) => {
-			console.log('<DEBUG>auth result is', res);
+			console.log('<DEBUG><setupNewConfig>auth result is', res);
 			const {
 				team,
 				user_id
@@ -1233,8 +1239,8 @@ exports.setupNewConfig = () => {
 
 			// Cache info on the users for ID translation and inviting to channels
 			// TODO - make this the bot's ID so it's excluded?
-			buildUserList(webClientBot);
-			getChannelList(webClientBot);
+			buildUserList(webClientUser);
+			getChannelList(webClientUser);
 		})
 		.catch((err) => {
 			console.error('<Error><validateBotConnection><auth.test>', err);
