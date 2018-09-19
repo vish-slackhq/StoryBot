@@ -18,6 +18,13 @@ exports.setConfig = (team_id, args) => {
     allConfigs[team_id] = {};
     allConfigs[team_id].message_history = [];
   }
+
+  // Allow full URLs
+  let match = args.gsheetID.match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
+  if (match) {
+    args.gsheetID = match[0];
+  }
+
   allConfigs[team_id].configParams = {
     gsheetID: args.gsheetID,
     clientEmail: args.clientEmail,
@@ -60,16 +67,16 @@ exports.loadConfig = (team_id) => {
 
 // jank jank jank
 exports.createWebClient = (team_id, access_token) => {
-//  console.log('<WEB CLIENT> Request for team', team_id);
+  //  console.log('<WEB CLIENT> Request for team', team_id);
   if (!allConfigs[team_id]) {
     allConfigs[team_id] = {};
     allConfigs[team_id].message_history = [];
     allConfigs[team_id].keys = [];
   }
   if (!allConfigs[team_id].webClientUser) {
-  //  console.log('<WEB CLIENT> Creating a new client');
+    //  console.log('<WEB CLIENT> Creating a new client');
     allConfigs[team_id].webClientUser = new WebClient(access_token);
   } else {
-  //  console.log('<WEB CLIENT> Found an existing client');
+    //  console.log('<WEB CLIENT> Found an existing client');
   }
 }

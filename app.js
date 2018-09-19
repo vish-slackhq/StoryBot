@@ -140,13 +140,8 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 		} else if (payload.callback_id === 'callback_admin_menu') {
 			storyBotTools.adminCallback(payload, respond, configTools);
 		} else if (payload.callback_id === 'callback_config') {
-						let gsheetID = payload.submission['Google Sheet Link'];
-			let match = gsheetID.match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
-			if (match) {
-				gsheetID = match[0];
-			} 
 			configTools.setConfig(auth.team_id, {
-				gsheetID: gsheetID,
+				gsheetID: payload.submission['Google Sheet Link'],
 				clientEmail: payload.submission['Google API Email'],
 				privateKey: payload.submission['Google Private Key']
 			});
