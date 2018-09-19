@@ -21,6 +21,7 @@ redis = require('./redis');
 const {
 	WebClient
 } = require('@slack/client');
+// use this to handle install requests
 const webClientAuth = new WebClient(process.env.SLACK_BOT_TOKEN);
 const qs = require('querystring');
 
@@ -31,10 +32,10 @@ const storyBotTools = require('./storytools.js');
 
 //for testing purposes only - populating my dev org until we can get some DB persistence for the 3 google vars
 redis.get('T56FL0NGJ').then((auth) => {
-//	console.log('redis results for team', auth.team_id, 'are', auth);
+	//	console.log('redis results for team', auth.team_id, 'are', auth);
 	let configParams = null;
 	if (!auth.configParams) {
-	//	console.log('storing shit')
+		//	console.log('storing shit')
 		configParams = {
 			gsheetID: process.env.GSHEET_ID,
 			clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
@@ -139,8 +140,13 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 		} else if (payload.callback_id === 'callback_admin_menu') {
 			storyBotTools.adminCallback(payload, respond, configTools);
 		} else if (payload.callback_id === 'callback_config') {
+						let gsheetID = payload.submission['Google Sheet Link'];
+			let match = gsheetID.match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
+			if (match) {
+				gsheetID = match[0];
+			} 
 			configTools.setConfig(auth.team_id, {
-				gsheetID: payload.submission['Google Sheet Link'],
+				gsheetID: gsheetID,
 				clientEmail: payload.submission['Google API Email'],
 				privateKey: payload.submission['Google Private Key']
 			});
