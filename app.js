@@ -21,13 +21,15 @@ redis = require('./redis');
 // Load the appropriate config file from Google Sheets
 var scriptConfig = require('./load-conf-google');
 
-scriptConfig.setConfig({
+/*
+scriptConfig.setConfig(team_id, {
 	gsheetID: process.env.GSHEET_ID,
 	clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
 	privateKey: process.env.GOOGLE_PRIVATE_KEY
 });
 
 scriptConfig.loadConfig().catch(console.error);
+*/
 
 // Express app server
 const http = require('http');
@@ -108,6 +110,14 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 			storyBotTools.historyCleanup(res.access_token, payload, respond);
 		} else if (payload.callback_id === 'callback_admin_menu') {
 			storyBotTools.adminCallback(res.access_token, payload, respond, scriptConfig);
+		} else if (payload.callback_id === 'callback_config') {
+			console.log('CONFIG TIME', payload);
+			scriptConfig.setConfig(payload.team.id, {
+				gsheetID: payload.submission['Google Sheet Link'],
+				clientEmail: payload.submission['Google API Email'],
+				privateKey: payload.submission['Google Private Key']
+			});
+			scriptConfig.loadConfig();
 		} else {
 			if (scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id)) {
 				storyBotTools.callbackMatch(res.access_token, payload, respond, scriptConfig.config.Callbacks.find(o => o.callback_name == payload.callback_id));
@@ -203,9 +213,13 @@ app.get('/install', (req, res) => {
 		//Storing the team ID in redis so we can verify the app by team token
 		//key value pair - team id, auth snippet
 		let setAuth = auth => redis.set(auth.team_id, auth)
-		let testAuth = auth => webClientAuth.auth.test({
-			token: auth.access_token
-		});
+		let testAuth = auth => {
+			webClientAuth.auth.test({
+				token: auth.access_token
+			}).then((res) => {
+				console.log('<Loading> Bot connected to workspace', res.team);
+			}).catch(console.error);
+		}
 		let args = {
 			client_id: process.env.SLACK_CLIENT_ID,
 			client_secret: process.env.SLACK_CLIENT_SECRET,

@@ -788,17 +788,17 @@ exports.adminMenu = (body) => {
 			style: 'default',
 			value: 'Reload Config'
 		}, {
-			name: 'Create Channels',
-			text: 'Create Channels',
-			type: 'button',
-			style: 'default',
-			value: 'Create Channels'
-		}, {
 			name: 'Config',
 			text: 'Config',
 			type: 'button',
 			style: 'default',
 			value: 'Config'
+		}, {
+			name: 'Create Channels',
+			text: 'Create Channels',
+			type: 'button',
+			style: 'default',
+			value: 'Create Channels'
 		}]
 	}];
 
@@ -915,6 +915,57 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 				}).catch((err) => {
 					console.error('<Error><Admin Menu><Cleanup All>', err);
 				});
+				break;
+			}
+		case 'Config':
+			{
+				// Get the Slack Web API client for the user's token
+				let webClientUser = getWebClient(access_token);
+
+				const configDialog = {
+					callback_id: 'callback_config',
+					title: 'Configuration Menu',
+					submit_label: 'Submit',
+					elements: [{
+						optional: false,
+						max_length: 150,
+						hint: 'URL to the Google Sheet with the Config Info',
+						name: 'Google Sheet Link',
+						value: '',
+						placeholder: '',
+						min_length: 0,
+						label: 'Google Sheet Link',
+						type: 'text'
+					}, {
+						optional: false,
+						max_length: 150,
+						hint: 'Email address that the sheet is shared with',
+						name: 'Google API Email',
+						value: '',
+						placeholder: '',
+						min_length: 0,
+						label: 'Google API Email',
+						type: 'text'
+					}, {
+						optional: false,
+						max_length: 2000,
+						hint: 'Private key',
+						name: 'Google Private Key',
+						value: '',
+						placeholder: '',
+						min_length: 0,
+						label: 'Google Private Key',
+						type: 'textarea'
+					}]
+				};
+
+				webClientUser.dialog.open({
+					trigger_id: payload.trigger_id,
+					dialog: configDialog
+				}).catch((err) => {
+					console.log('<Error><Admin Menu><Config dialog.open>', err);
+				});
+
 				break;
 			}
 		case 'Create Channels':
@@ -1133,12 +1184,35 @@ exports.historyCleanup = (access_token, payload, respond) => {
 
 // Do the initial work to make sure there's a valid connection, cache users and channels
 exports.validateBotConnection = () => {
-	// Let's try and set the right user's token
-	webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
+	// Start up with the Bot's token
+	let webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 	webClientBot.auth.test()
 		.then((res) => {
+			console.log('<DEBUG>auth result is', res);
+			const {
+				team,
+				user_id
+			} = res;
+			console.log('<Loading> Bot connected to workspace', team);
 
+			// Cache info on the users for ID translation and inviting to channels
+			// TODO - make this the bot's ID so it's excluded?
+			buildUserList(webClientBot);
+			getChannelList(webClientBot);
+		})
+		.catch((err) => {
+			console.error('<Error><validateBotConnection><auth.test>', err);
+		});
+}
+
+// Do the initial work to make sure there's a valid connection, cache users and channels
+exports.setupNewConfig = () => {
+	// Start up with the Bot's token
+	let webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
+
+	webClientBot.auth.test()
+		.then((res) => {
 			console.log('<DEBUG>auth result is', res);
 			const {
 				team,

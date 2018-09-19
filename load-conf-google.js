@@ -6,9 +6,11 @@
 
 const extractGSheet = require('spreadsheet-to-json');
 require('dotenv').config();
-var googleData = {};
 
-exports.setConfig = (args) => {
+//var configData
+var googleData = [];
+
+exports.setConfig = (team_id, args) => {
   // TODO this is not elegant, but let's just test if this can work
   if (args.gsheetID) {
     googleData.gsheetID = args.gsheetID;
@@ -19,6 +21,10 @@ exports.setConfig = (args) => {
    if (args.privateKey) {
     googleData.privateKey = args.privateKey;
   }
+}
+
+exports.getConfig = (team_id) => {
+
 }
 
 // Load config
