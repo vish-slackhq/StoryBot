@@ -251,7 +251,7 @@ app.get('/install', (req, res) => {
 					code: req.query.code
 				}
 				//	webClientAuth.oauth.access(args).then(setAuth).then(testAuth).then(redirect);
-				axios.post('https://slack.com/api/oauth.access', qs.stringify(args).then(setAuth).then(testAuth).then(redirect);
+				axios.post('https://slack.com/api/oauth.access', qs.stringify(args)).then(setAuth).then(testAuth).then(redirect);
 
 				}
 				else {
