@@ -4,8 +4,6 @@ const async = require("async");
 // Need this for shared message due to no SDK suppport
 const qs = require('querystring');
 const axios = require('axios');
-// Fun with oAuth
-redis = require('./redis');
 
 // Webhooks for slash command response
 const {
@@ -13,28 +11,27 @@ const {
 } = require('@slack/client');
 
 // Create a new web client
-const {
-	WebClient
-} = require('@slack/client');
+//const {
+//	WebClient
+//} = require('@slack/client');
 // Let's try this - empty WebClient for global, will be set on bot startup with the right user token
 //var webClientUser = null;
-var webClientArray = [];
+//var webClientArray = [];
 
 // TODO: figure out this whole token mess
 //const webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
 
 // Global variables - way to not need these?
 // TODO - now that we pass in the config to playback, keep each sessions history and caches under their config!
-var message_history = []; // maintains the running session history, used for deletes and reply/reaction targets
-var user_list = []; // cached user list for quicker lookups
-var channel_list = []; // cached channel list for quicker lookups
+//var message_history = []; // maintains the running session history, used for deletes and reply/reaction targets
+//var user_list = []; // cached user list for quicker lookups
+//var channel_list = []; // cached channel list for quicker lookups
 
 // The main function that plays back a given trigger once it's matched
 // Takes the config for the specific trigger we are playing back, list of user tokens, and event data
 exports.playbackScript = (access_token, config, term, event) => {
 	// Get the Slack Web API client for the user's token
-	let webClientUser = getWebClient(access_token);
-
+	//	let webClientUser = getWebClient(access_token);
 	let tokens = config.scripts.Tokens;
 
 	// Form the string for unique message_history entry
@@ -43,7 +40,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 
 	// Add history for a reaction trigger
 	if (event.reaction) {
-		addHistory(trigger_term, {
+		addHistory(config, trigger_term, {
 			item: -1,
 			type: 'reaction_trigger',
 			channel: event.channel,
@@ -54,7 +51,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 	} else if (!config.scripts[term][0].delete_trigger && !(config.scripts[term][0].type == 'reply' && config.scripts[term][0].target_item === 'trigger')) {
 
 		// Make it easy to cleanup the trigger term
-		addHistory(trigger_term, {
+		addHistory(config, trigger_term, {
 			item: -1,
 			type: 'trigger',
 			channel: event.channel,
@@ -70,7 +67,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 
 			//Clean up a fake slash command or other item that has `delete_trigger` set
 			if (action.delete_trigger) {
-				webClientUser.chat.delete({
+				config.webClientUser.chat.delete({
 					//		webClientArray
 					channel: event.channel,
 					ts: event.ts
@@ -127,8 +124,8 @@ exports.playbackScript = (access_token, config, term, event) => {
 								target_channel = event.channel;
 							} else {
 								// Otherwise just set the targets by looking them up in the existing message_history
-								target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
-								target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
+								target_ts = config.message_history[trigger_term].find(o => o.item == action.target_item).ts;
+								target_channel = config.message_history[trigger_term].find(o => o.item == action.target_item).channel;
 							}
 						}
 
@@ -137,7 +134,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 							case 'message':
 							case 'reply':
 								{
-									webClientUser.chat.postMessage({
+									config.webClientUser.chat.postMessage({
 										token: tokens.find(o => o.name === action.username).token, //look up the user's token to post on their behalf
 										as_user: true,
 										username: action.username,
@@ -150,7 +147,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 									})
 									.then((res) => {
 										//Add what just happened to the history
-										addHistory(trigger_term, {
+										addHistory(config, trigger_term, {
 											item: action.item,
 											type: action.type,
 											channel: res.channel,
@@ -190,10 +187,10 @@ exports.playbackScript = (access_token, config, term, event) => {
 									}
 
 									if (!action.ephemeral) {
-										webClientUser.chat.postMessage(params)
+										config.webClientUser.chat.postMessage(params)
 											.then((res) => {
 												//Add what just happened to the history
-												addHistory(trigger_term, {
+												addHistory(config, trigger_term, {
 													item: action.item,
 													type: action.type,
 													channel: res.channel,
@@ -212,10 +209,10 @@ exports.playbackScript = (access_token, config, term, event) => {
 											});
 									} else {
 										params.user = event.user;
-										webClientUser.chat.postEphemeral(params)
+										config.webClientUser.chat.postEphemeral(params)
 											.then((res) => {
 												//Add what just happened to the history
-												addHistory(trigger_term, {
+												addHistory(config, trigger_term, {
 													item: action.item,
 													type: 'ephemeral',
 													channel: res.channel,
@@ -237,7 +234,8 @@ exports.playbackScript = (access_token, config, term, event) => {
 								}
 							case 'reaction':
 								{
-									webClientUser.reactions.add({
+									console.log('reactions.add target_ts:',target_ts,'target_channel:',target_channel);
+									config.webClientUser.reactions.add({
 										token: tokens.find(o => o.name === action.username).token,
 										as_user: true,
 										username: action.username,
@@ -247,7 +245,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 									})
 									.then((res) => {
 										//Add what just happened to the history
-										addHistory(trigger_term, {
+										addHistory(config, trigger_term, {
 											item: action.item,
 											type: action.type,
 											channel: res.channel,
@@ -268,7 +266,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 								}
 							case 'file':
 								{
-									webClientUser.files.upload({
+									config.webClientUser.files.upload({
 										token: tokens.find(o => o.name === action.username).token,
 										channels: action.channel,
 										filetype: action.filetype,
@@ -282,14 +280,14 @@ exports.playbackScript = (access_token, config, term, event) => {
 										let fileChannel = res.file.channels[0];
 										let fileShareTS = res.file.shares.public[fileChannel][0].ts;
 										//Add what just happened to the history - File
-										addHistory(trigger_term, {
+										addHistory(config, trigger_term, {
 											item: action.item,
 											type: action.type,
 											channel: res.file.channels[0],
 											ts: res.file.id
 										}).then((res) => {
 											//Add what just happened to the history - message that referenced the file
-											addHistory(trigger_term, {
+											addHistory(config, trigger_term, {
 												item: -1 * action.item,
 												type: 'message',
 												channel: fileChannel,
@@ -313,7 +311,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 								}
 							case 'status':
 								{
-									webClientUser.users.profile.set({
+									config.webClientUser.users.profile.set({
 										token: tokens.find(o => o.name === action.username).token,
 										profile: {
 											"status_text": action.text,
@@ -322,7 +320,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 									})
 									.then((res) => {
 										//Add what just happened to the history
-										addHistory(trigger_term, {
+										addHistory(config, trigger_term, {
 											item: action.item,
 											type: action.type,
 											username: res.username,
@@ -365,7 +363,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 										}
 
 										//Add what just happened to the history
-										addHistory(trigger_term, {
+										addHistory(config, trigger_term, {
 											item: action.item,
 											type: action.type,
 											channel: result.data.channel,
@@ -387,7 +385,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 								{
 									// Private API method to share a file, needs to be called manually
 									apiMethod = 'files.share';
-									let sharefileChannelId = getChannelId(action.channel);
+									let sharefileChannelId = getChannelId(config, action.channel);
 
 									params = {
 										token: tokens.find(o => o.name === action.username).token,
@@ -400,11 +398,11 @@ exports.playbackScript = (access_token, config, term, event) => {
 									axios.post('https://slack.com/api/' + apiMethod, qs.stringify(params))
 									.then((result) => {
 										// Need to get back some additional information to account for File Threads
-										webClientUser.files.info({
+										config.webClientUser.files.info({
 											file: action.target_item
 										}).then((res) => {
 											//Add what just happened to the history
-											addHistory(trigger_term, {
+											addHistory(config, trigger_term, {
 												item: action.item,
 												type: 'message',
 												channel: sharefileChannelId,
@@ -428,15 +426,15 @@ exports.playbackScript = (access_token, config, term, event) => {
 								}
 							case 'invite':
 								{
-									let userId = getUserId(action.text)
-									webClientUser.channels.invite({
+									let userId = getUserId(config, action.text)
+									config.webClientUser.channels.invite({
 										token: tokens.find(o => o.name === action.username).token,
-										channel: getChannelId(action.channel),
+										channel: getChannelId(config, action.channel),
 										user: userId
 									})
 									.then((res) => {
 										//Add what just happened to the history
-										addHistory(trigger_term, {
+										addHistory(config, trigger_term, {
 											item: action.item,
 											type: action.type,
 											channel: res.channel.id,
@@ -470,13 +468,13 @@ exports.playbackScript = (access_token, config, term, event) => {
 								target_channel = event.channel;
 								// Otherwise look up the referenced trigger item in the existing message_history
 							} else {
-								target_ts = message_history[trigger_term].find(o => o.item == action.target_item).ts;
-								target_channel = message_history[trigger_term].find(o => o.item == action.target_item).channel;
+								target_ts = config.message_history[trigger_term].find(o => o.item == action.target_item).ts;
+								target_channel = config.message_history[trigger_term].find(o => o.item == action.target_item).channel;
 							}
 						}
 						// Prototype reaction
 						if (action.reaction) {
-							webClientUser.reactions.add({
+							config.webClientUser.reactions.add({
 									as_user: false,
 									username: action.username,
 									channel: target_channel,
@@ -485,7 +483,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 								})
 								.then((res) => {
 									//Add what just happened to the history
-									addHistory(trigger_term, {
+									addHistory(config, trigger_term, {
 										item: action.item,
 										type: action.type,
 										channel: res.channel,
@@ -503,7 +501,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 								});
 							// Otherwise this is a message/bot message
 						} else {
-							webClientUser.chat.postMessage({
+							config.webClientUser.chat.postMessage({
 								as_user: false,
 								username: action.username,
 								channel: action.channel,
@@ -516,7 +514,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 								attachments: action.attachments
 							}).then((res) => {
 								//Add what just happened to the history
-								addHistory(trigger_term, {
+								addHistory(config, trigger_term, {
 									item: action.item,
 									type: action.type,
 									channel: res.channel,
@@ -544,9 +542,9 @@ exports.playbackScript = (access_token, config, term, event) => {
 }
 
 // Process a match from the dynamic callback sheet
-exports.callbackMatch = (access_token, payload, respond, callback) => {
+exports.callbackMatch = (access_token, payload, respond, config, callback) => {
 	// Get the Slack Web API client for the user's token
-	let webClientUser = getWebClient(access_token);
+	//let webClientUser = getWebClient(access_token);
 
 	console.log('<DEBUG><callbackMatch> Starting callback match for', callback.callback_name);
 
@@ -570,14 +568,14 @@ exports.callbackMatch = (access_token, payload, respond, callback) => {
 			trigger_id: payload.trigger_id,
 			dialog: callback.attachments
 		}
-		webClientUser.dialog.open(response).catch((err) => {
+		config.webClientUser.dialog.open(response).catch((err) => {
 			console.error('<Error><callbackMatch><dialog.open> Dialog Open errored out with', err, 'and response_metadata', err.data.response_metadata);
 		});
 	}
 
 	// Ephemeral response as well
 	if (callback.ephemeral) {
-		webClientUser.chat.postEphemeral({
+		config.webClientUser.chat.postEphemeral({
 			user: payload.user.id,
 			channel: payload.channel.id,
 			as_user: false,
@@ -593,15 +591,15 @@ exports.callbackMatch = (access_token, payload, respond, callback) => {
 	delay(callback.delay * 1000).then((res) => {
 		// Invite based on an interactive message
 		if (callback.invite) {
-			let userId = getUserId(callback.username)
+			let userId = getUserId(config, callback.username)
 			response = {
 				user: userId,
 				channel: payload.channel.id
 			}
-			webClientUser.channels.invite(response)
+			config.webClientUser.channels.invite(response)
 				.then((res) => {
 					//Add what just happened to the history
-					addHistory(callback.callback_name, {
+					addHistory(config, callback.callback_name, {
 						item: 0,
 						type: "invite",
 						channel: res.channel.id,
@@ -640,15 +638,15 @@ exports.callbackMatch = (access_token, payload, respond, callback) => {
 		};
 
 		if (callback.channel != 'current') {
-			response.channel = getChannelId(callback.channel);
+			response.channel = getChannelId(config, callback.channel);
 		}
 
 		if (callback.update) {
 			// TODO - This should be a respond(), right?
-			webClientUser.chat.update(response)
+			config.webClientUser.chat.update(response)
 				.then((res) => {
 					//Add what just happened to the history
-					addHistory(callback.callback_name, {
+					addHistory(config, callback.callback_name, {
 						item: -10,
 						type: 'callback_postMessage',
 						channel: res.channel,
@@ -661,10 +659,10 @@ exports.callbackMatch = (access_token, payload, respond, callback) => {
 				});
 		} else {
 			// TODO - This should be a respond(), right?
-			webClientUser.chat.postMessage(response)
+			config.webClientUser.chat.postMessage(response)
 				.then((res) => {
 					//Add what just happened to the history
-					addHistory(callback.callback_name, {
+					addHistory(config, callback.callback_name, {
 						item: -10,
 						type: 'callback_postMessage',
 						channel: res.channel,
@@ -681,26 +679,26 @@ exports.callbackMatch = (access_token, payload, respond, callback) => {
 }
 
 // Delete something from the history
-const deleteHistoryItem = (access_token, term) => {
+const deleteHistoryItem = (config, access_token, term) => {
 
 	// Get the Slack Web API client for the user's token
-	let webClientUser = getWebClient(access_token);
+	//	let webClientUser = getWebClient(access_token);
 
-	if (!message_history[term]) {
+	if (!config.message_history[term]) {
 		console.log('<Error><deleteHistoryItem> Well this is embarassing:' + term + "doesn't exist in history");
 		// Send this back to format an in-Slack message
 		return 'Well this is embarassing: ' + term + " doesn't exist in history";
 	} else {
-		async.each(message_history[term], function(historyItem, nextItem) {
+		async.each(config.message_history[term], function(historyItem, nextItem) {
 			if (historyItem.type === 'file') {
-				webClientUser.files.delete({
+				config.webClientUser.files.delete({
 					file: historyItem.ts
 				}).catch((err) => {
 					console.error('<Error><deleteHistoryItem><files.delete>', err);
 				});
 			} else if (historyItem.type === 'status') {
-				webClientUser.users.profile.set({
-					user: getUserId(historyItem.username),
+				config.webClientUser.users.profile.set({
+					user: getUserId(config, historyItem.username),
 					profile: {
 						"status_text": "",
 						"status_emoji": ""
@@ -709,7 +707,7 @@ const deleteHistoryItem = (access_token, term) => {
 					console.error('<Error><deleteHistoryItem><users.profile.set>', err);
 				});
 			} else if (historyItem.type === 'invite') {
-				webClientUser.channels.kick({
+				config.webClientUser.channels.kick({
 					channel: historyItem.channel,
 					user: historyItem.user
 				}).catch((err) => {
@@ -717,7 +715,7 @@ const deleteHistoryItem = (access_token, term) => {
 				});
 			} else if (historyItem.type === 'reaction_trigger') {
 				console.log('<DEBUG><reaction trigger history delete> name:', historyItem.reaction, 'channel:', historyItem.channel, 'timestamp:', historyItem.ts);
-				webClientUser.reactions.remove({
+				config.webClientUser.reactions.remove({
 					name: historyItem.reaction,
 					channel: historyItem.channel,
 					timestamp: historyItem.ts
@@ -727,7 +725,7 @@ const deleteHistoryItem = (access_token, term) => {
 
 				});
 			} else if (!(historyItem.type === 'reaction') && !(historyItem.type === 'ephemeral')) { //&& !(message_history[term][i].type === 'trigger')) {
-				webClientUser.chat.delete({
+				config.webClientUser.chat.delete({
 					channel: historyItem.channel,
 					ts: historyItem.ts
 				}).catch((err) => {
@@ -736,7 +734,7 @@ const deleteHistoryItem = (access_token, term) => {
 			}
 			nextItem();
 		});
-		delete message_history[term];
+		delete config.message_history[term];
 		console.log('<History> Successfully deleted', term, 'from the history.');
 		return 'Successfully deleted ' + term + ' from the history.';
 	}
@@ -817,16 +815,24 @@ exports.adminMenu = (body) => {
 
 // Handle the admin menu callbacks
 exports.adminCallback = (access_token, payload, respond, configTools) => {
-	console.log('<DEBUG><adminCallback> called with payload.actions[0].value:', payload);
+	//console.log('<DEBUG><adminCallback> called with payload.actions[0].value:', payload);
+	let config = configTools.getConfig(payload.team.id);
+
+	// This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
+	//l ets just create a new webclient so we can get to the config menu stuff
+	if (!config) {
+		configTools.createWebClient(payload.team.id, access_token);
+		config = configTools.getConfig(payload.team.id);
+	}
 	switch (payload.actions[0].value) {
 		case 'Triggers':
 			{
-				let triggerKeys = configTools.getConfig(payload.team.id).keys;
+				//let triggerKeys = config.keys;
 
-				if (triggerKeys.length > 0) {
+				if (config.keys.length > 0) {
 					let attachments = [];
 					let key_list = ""
-					triggerKeys.forEach(function(key) {
+					config.keys.forEach(function(key) {
 						if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks')) {
 							key_list = key_list + " \`" + key + "\`";
 						}
@@ -853,14 +859,14 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 			}
 		case 'History':
 			{
-				console.log('<Admin Menu> History is:', message_history);
+				console.log('<Admin Menu> History is:', config.message_history);
 				let response = {
 					response_type: 'ephemeral',
 					replace_original: true,
 					text: "No history right now"
 				}
 
-				let message_history_keys = Object.keys(message_history);
+				let message_history_keys = Object.keys(config.message_history);
 
 				if (message_history_keys.length > 0) {
 					let attachments = [];
@@ -909,7 +915,7 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 			}
 		case 'Cleanup All':
 			{
-				let msg = deleteAllHistory(access_token);
+				let msg = deleteAllHistory(config, access_token);
 				respond({
 					text: msg,
 					replace_original: true,
@@ -922,16 +928,16 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 		case 'Config':
 			{
 				// Get the Slack Web API client for the user's token
-				let webClientUser = getWebClient(access_token);
+				//	let webClientUser = getWebClient(access_token);
 
 				// TODO janky, fix eventually
-				console.log('payload.team.id:', payload.team.id);
-				let config = configTools.getConfig(payload.team.id);
+				console.log('Config request for team', payload.team.id);
+			//	let config = configTools.getConfig(payload.team.id);
 
 				let gsheetID = '',
 					clientEmail = '',
 					privateKey = '';
-				if (config) {
+				if (config.googleData) {
 					gsheetID = config.googleData.gsheetID;
 					clientEmail = config.googleData.clientEmail;
 					privateKey = config.googleData.privateKey;
@@ -974,7 +980,7 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 					}]
 				};
 
-				webClientUser.dialog.open({
+				config.webClientUser.dialog.open({
 					trigger_id: payload.trigger_id,
 					dialog: configDialog
 				}).catch((err) => {
@@ -1026,25 +1032,25 @@ const delay = (time) => {
 }
 
 // Add to the global history for later cleanup
-const addHistory = (name, data) => {
+const addHistory = (config, term, data) => {
 	return new Promise(function(resolve) {
-		if (!message_history[name]) {
-			message_history[name] = [];
+		if (!config.message_history[term]) {
+			config.message_history[term] = [];
 		}
-		resolve(message_history[name].push(data));
+		resolve(config.message_history[term].push(data));
 	});
 }
 
 // Burn it all down
-const deleteAllHistory = (access_token) => {
-	let historyKeys = Object.keys(message_history);
+const deleteAllHistory = (config, access_token) => {
+	let historyKeys = Object.keys(config.message_history);
 	//	console.log('<DEBUG> Time to delete all history with keys', historyKeys);
 	if (!(historyKeys.length > 0)) {
 		console.log('<History> No history to delete!');
 		return "No history to delete!";
 	} else {
 		historyKeys.forEach(function(key) {
-			deleteHistoryItem(access_token, key);
+			deleteHistoryItem(config, access_token, key);
 		});
 		return "All history deleted";
 	}
@@ -1055,15 +1061,15 @@ const deleteAllHistory = (access_token) => {
 exports.deleteItem = (access_token, channel, ts) => {
 
 	// Get the Slack Web API client for the user's token
-	let webClientUser = getWebClient(access_token);
+	//	let webClientUser = getWebClient(access_token);
 
 	// Get a list of any thread replies to delete as well
-	webClientUser.channels.replies({
+	config.webClientUser.channels.replies({
 		channel: channel,
 		thread_ts: ts
 	}).then((res) => {
 		res.messages.forEach(function(message) {
-			webClientUser.chat.delete({
+			config.webClientUser.chat.delete({
 				channel: channel,
 				ts: message.ts
 			}).catch(console.error);
@@ -1073,47 +1079,48 @@ exports.deleteItem = (access_token, channel, ts) => {
 	});
 }
 
+// TODO - put these as helpers in the config?
 // Get the list of all users and their IDs and store it for faster caching
-const buildUserList = (webClientBot) => {
-	webClientBot.users.list()
+const buildUserList = (config) => {
+	config.webClientUser.users.list()
 		.then((res) => {
-			user_list = res.members;
-	//		console.log('debug user list:',user_list);
+			config.user_list = res.members;
+			//		console.log('debug user list:',user_list);
 		}).catch((err) => {
 			console.error('<Error><buildUserList><users.list>', err);
 		});
 }
 
 // Look up User ID from a Name
-const getUserId = (name) => {
+const getUserId = (config, name) => {
 	//remove any spaces in the names being passed
 	name = name.replace(/\s+/g, '');
 	// TODO	let id = user_list.find(o => o.name === name).id;
 	// TODO	return id;
-	return user_list.find(o => o.name === name).id
+	return config.user_list.find(o => o.name === name).id
 }
 
 // Get the list of all channels and their IDs and cache it
-const getChannelList = (webClientBot) => {
-	webClientBot.channels.list({
+const buildChannelList = (config) => {
+	config.webClientUser.channels.list({
 			exclude_members: true,
 			exclude_archived: true,
 			get_private: true
 		})
 		.then((res) => {
-			channel_list = res.channels;
-	//		console.log('debug channel list:',channel_list);
+			config.channel_list = res.channels;
+			//		console.log('debug channel list:',channel_list);
 		})
 		.catch((err) => {
-			console.error('<Error><getChannelListm><channels.list>', err);
+			console.error('<Error><buildChannelListm><channels.list>', err);
 		});
 }
 
 // Look up Channel ID from a Name
-const getChannelId = (name) => {
+const getChannelId = (config, name) => {
 	let result = null;
-	if (channel_list.find(channel => channel.name === name)) {
-		result = channel_list.find(channel => channel.name === name).id;
+	if (config.channel_list.find(channel => channel.name === name)) {
+		result = config.channel_list.find(channel => channel.name === name).id;
 	}
 	return result;
 }
@@ -1188,8 +1195,8 @@ const createChannels = (channelInfo) => {
 }
 
 // Clean up the history when a specific history term is being cleaned
-exports.historyCleanup = (access_token, payload, respond) => {
-	let msg = deleteHistoryItem(access_token, payload.actions[0].value);
+exports.historyCleanup = (config, access_token, payload, respond) => {
+	let msg = deleteHistoryItem(config, access_token, payload.actions[0].value);
 
 	response = {
 		text: msg,
@@ -1216,7 +1223,7 @@ exports.validateBotConnection = () => {
 			// Cache info on the users for ID translation and inviting to channels
 			// TODO - make this the bot's ID so it's excluded?
 			buildUserList(webClientBot);
-			getChannelList(webClientBot);
+			buildChannelList(webClientBot);
 		})
 		.catch((err) => {
 			console.error('<Error><validateBotConnection><auth.test>', err);
@@ -1224,11 +1231,10 @@ exports.validateBotConnection = () => {
 }
 
 // Do the initial work to make sure there's a valid connection, cache users and channels
-exports.setupNewConfig = (team_id) => {
+exports.setupNewConfig = (config, team_id) => {
 	// Get the Slack Web API client for the user's token
-	let webClientUser = getWebClient(team_id);
-console.log('WSETUPNEWCONFIG web client is',webClientUser);
-	webClientUser.auth.test()
+	//let webClientUser = getWebClient(team_id);
+	config.webClientUser.auth.test()
 		.then((res) => {
 			console.log('<DEBUG><setupNewConfig>auth result is', res);
 			const {
@@ -1239,15 +1245,15 @@ console.log('WSETUPNEWCONFIG web client is',webClientUser);
 
 			// Cache info on the users for ID translation and inviting to channels
 			// TODO - make this the bot's ID so it's excluded?
-			buildUserList(webClientUser);
-			getChannelList(webClientUser);
+			buildUserList(config);
+			buildChannelList(config);
 		})
 		.catch((err) => {
 			console.error('<Error><validateBotConnection><auth.test>', err);
 		});
 }
 
-const getWebClient = (token) => {
+const getWebClient = (config, token) => {
 	console.log('<WEB CLIENT> Request for token', token);
 	if (!webClientArray[token]) {
 		console.log('<WEB CLIENT> Creating a new client:');

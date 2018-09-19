@@ -7,14 +7,18 @@
 const extractGSheet = require('spreadsheet-to-json');
 // Fun with oAuth
 redis = require('./redis');
+// Create a new web client
+const {
+  WebClient
+} = require('@slack/client');
 
 var allConfigs = [];
 
 exports.setConfig = (team_id, args) => {
   // TODO this is not elegant, but let's just test if this can work
-
   if (!allConfigs[team_id]) {
     allConfigs[team_id] = {};
+    allConfigs[team_id].message_history = [];
   }
   allConfigs[team_id].googleData = {
     gsheetID: args.gsheetID,
@@ -59,4 +63,19 @@ exports.loadConfig = (team_id) => {
       resolve(data);
     });
   })
+}
+
+// jank jank jank
+exports.createWebClient = (team_id, access_token) => {
+  console.log('<WEB CLIENT> Request for team', team_id);
+  if (!allConfigs[team_id]) {
+    allConfigs[team_id] = {};
+    allConfigs[team_id].message_history = [];
+  }
+  if (!allConfigs[team_id].webClientUser) {
+    console.log('<WEB CLIENT> Creating a new client');
+    allConfigs[team_id].webClientUser = new WebClient(access_token);
+  } else {
+    console.log('<WEB CLIENT> Found an existing client');
+  }
 }

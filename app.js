@@ -33,7 +33,8 @@ configTools.setConfig('T56FL0NGJ', {
 
 configTools.loadConfig('T56FL0NGJ').catch(console.error);
 redis.get('T56FL0NGJ').then((res) => {
-	storyBotTools.setupNewConfig(res.access_token);
+	configTools.createWebClient('T56FL0NGJ', res.access_token);
+	storyBotTools.setupNewConfig(configTools.getConfig('T56FL0NGJ'));
 });
 
 
@@ -117,20 +118,22 @@ slackEvents.on('error', console.error);
 slackInteractions.action(/callback_/, (payload, respond) => {
 	redis.get(payload.team.id).then((auth) => {
 		if (payload.callback_id === 'callback_history_cleanup') {
-			storyBotTools.historyCleanup(auth.access_token, payload, respond);
+			storyBotTools.historyCleanup(configTools.getConfig(auth.team_id), auth.access_token, payload, respond);
 		} else if (payload.callback_id === 'callback_admin_menu') {
 			storyBotTools.adminCallback(auth.access_token, payload, respond, configTools);
 		} else if (payload.callback_id === 'callback_config') {
-			configTools.setConfig(auth.team.id, {
+			configTools.setConfig(auth.team_id, {
 				gsheetID: payload.submission['Google Sheet Link'],
 				clientEmail: payload.submission['Google API Email'],
 				privateKey: payload.submission['Google Private Key']
 			});
-			configTools.loadConfig(auth.team.id);
-			storyBotTools.setupNewConfig(auth.access_token);
+			configTools.loadConfig(auth.team_id);
+			configTools.createWebClient(auth.team_id, auth.access_token);
+			storyBotTools.setupNewConfig(configTools.getConfig(auth.team_id));
 		} else {
-			if (configTools.getConfig(auth.team.id).scripts.Callbacks.find(o => o.callback_name == payload.callback_id)) {
-				storyBotTools.callbackMatch(auth.access_token, payload, respond, configTools.getConfig(auth.team.id).scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
+			let config = configTools.getConfig(auth.team_id);
+			if (config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id)) {
+				storyBotTools.callbackMatch(auth.access_token, payload, respond, config, config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
 			} else {
 				console.log('<Callback> No match in the config for', payload.callback_id);
 			}
@@ -177,7 +180,7 @@ app.post('/slack/commands', function(req, res) {
          Actual: ${slashSig}`);
 	}
 
-	console.log('<DEBUG><oAuth><slash handler> request is', req.body);
+//	console.log('<DEBUG><oAuth><slash handler> request is', req.body);
 
 	// Check if the requesting team / user is already in the DB
 	redis.get(req.body.team_id).then((auth) => {
