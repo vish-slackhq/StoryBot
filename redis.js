@@ -15,7 +15,7 @@ exports.get = function(key) {
   return new Promise((resolve, reject) => {
     redis.get(key, (err, result) => {
       let data = JSON.parse(result || "{}")
- //     console.log('REDIS <get> key:', key, 'data:', data);
+      console.log('REDIS <get> key:', key, 'data:', data);
       if (err) return reject(err)
       else resolve(data)
     })

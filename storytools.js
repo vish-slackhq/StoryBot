@@ -10,28 +10,10 @@ const {
 	IncomingWebhook
 } = require('@slack/client');
 
-// Create a new web client
-//const {
-//	WebClient
-//} = require('@slack/client');
-// Let's try this - empty WebClient for global, will be set on bot startup with the right user token
-//var webClientUser = null;
-//var webClientArray = [];
-
-// TODO: figure out this whole token mess
-//const webClientUser = new WebClient(process.env.SLACK_AUTH_TOKEN);
-
-// Global variables - way to not need these?
-// TODO - now that we pass in the config to playback, keep each sessions history and caches under their config!
-//var message_history = []; // maintains the running session history, used for deletes and reply/reaction targets
-//var user_list = []; // cached user list for quicker lookups
-//var channel_list = []; // cached channel list for quicker lookups
-
 // The main function that plays back a given trigger once it's matched
 // Takes the config for the specific trigger we are playing back, list of user tokens, and event data
 exports.playbackScript = (access_token, config, term, event) => {
 	// Get the Slack Web API client for the user's token
-	//	let webClientUser = getWebClient(access_token);
 	let tokens = config.scripts.Tokens;
 
 	// Form the string for unique message_history entry
@@ -937,10 +919,10 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 				let gsheetID = '',
 					clientEmail = '',
 					privateKey = '';
-				if (config.googleData) {
-					gsheetID = config.googleData.gsheetID;
-					clientEmail = config.googleData.clientEmail;
-					privateKey = config.googleData.privateKey;
+				if (config.configParams) {
+					gsheetID = config.configParams.gsheetID;
+					clientEmail = config.configParams.clientEmail;
+					privateKey = config.configParams.privateKey;
 				}
 
 				const configDialog = {
@@ -1251,15 +1233,4 @@ exports.setupNewConfig = (config, team_id) => {
 		.catch((err) => {
 			console.error('<Error><validateBotConnection><auth.test>', err);
 		});
-}
-
-const getWebClient = (config, token) => {
-	console.log('<WEB CLIENT> Request for token', token);
-	if (!webClientArray[token]) {
-		console.log('<WEB CLIENT> Creating a new client:');
-		webClientArray[token] = new WebClient(token);
-	} else {
-		console.log('<WEB CLIENT> Found an existing client');
-	}
-	return webClientArray[token];
 }

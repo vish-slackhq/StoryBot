@@ -5,8 +5,6 @@
 */
 
 const extractGSheet = require('spreadsheet-to-json');
-// Fun with oAuth
-redis = require('./redis');
 // Create a new web client
 const {
   WebClient
@@ -20,7 +18,7 @@ exports.setConfig = (team_id, args) => {
     allConfigs[team_id] = {};
     allConfigs[team_id].message_history = [];
   }
-  allConfigs[team_id].googleData = {
+  allConfigs[team_id].configParams = {
     gsheetID: args.gsheetID,
     clientEmail: args.clientEmail,
     privateKey: args.privateKey
@@ -41,12 +39,12 @@ exports.loadConfig = (team_id) => {
   return new Promise((resolve) => {
     extractGSheet.extractSheets({
       // your google spreadhsheet key 
-      spreadsheetKey: allConfigs[team_id].googleData.gsheetID, // || process.env.GSHEET_ID,
+      spreadsheetKey: allConfigs[team_id].configParams.gsheetID, // || process.env.GSHEET_ID,
       // your google oauth2 credentials 
       //   credentials: require(process.env.GOOGLE_API_CREDS || './google_sheets_creds.json'),
       credentials: {
-        client_email: allConfigs[team_id].googleData.clientEmail, // || process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: allConfigs[team_id].googleData.privateKey, // || process.env.GOOGLE_PRIVATE_KEY
+        client_email: allConfigs[team_id].configParams.clientEmail, // || process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: allConfigs[team_id].configParams.privateKey, // || process.env.GOOGLE_PRIVATE_KEY
       },
       // names of the sheet you want to extract (or [] for all) 
       sheetsToExtract: []

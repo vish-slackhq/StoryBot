@@ -23,18 +23,27 @@ var configTools = require('./load-conf-google');
 // Set up the Storybot tools - where the magic happens
 const storyBotTools = require('./storytools.js');
 
-//for testing
-
-configTools.setConfig('T56FL0NGJ', {
-	gsheetID: process.env.GSHEET_ID,
-	clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-	privateKey: process.env.GOOGLE_PRIVATE_KEY
-});
-
-configTools.loadConfig('T56FL0NGJ').catch(console.error);
-redis.get('T56FL0NGJ').then((res) => {
-	configTools.createWebClient('T56FL0NGJ', res.access_token);
-	storyBotTools.setupNewConfig(configTools.getConfig('T56FL0NGJ'));
+//for testing purposes only
+redis.get('T56FL0NGJ').then((auth) => {
+	console.log('redis results for team', auth.team_id, 'are', auth);
+	let configParams = null;
+	if (!auth.configParams) {
+		console.log('storing shit')
+		configParams = {
+			gsheetID: process.env.GSHEET_ID,
+			clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
+			privateKey: process.env.GOOGLE_PRIVATE_KEY
+		};
+	//	redis.set(auth.team_id, configParams);
+	}
+	configTools.setConfig(auth.team_id, {
+			gsheetID: process.env.GSHEET_ID,
+			clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
+			privateKey: process.env.GOOGLE_PRIVATE_KEY
+		});//auth.configParams || configParams);
+	configTools.loadConfig(auth.team_id).catch(console.error);
+	configTools.createWebClient(auth.team_id, auth.access_token);
+	storyBotTools.setupNewConfig(configTools.getConfig(auth.team_id));
 });
 
 
@@ -66,8 +75,6 @@ const app = express();
 app.use('/slack/actions', slackInteractions.expressMiddleware());
 // Mount the event handler on a route
 app.use('/slack/events', slackEvents.expressMiddleware());
-
-
 
 // Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
 slackEvents.on('message', (event, body) => {
@@ -180,7 +187,7 @@ app.post('/slack/commands', function(req, res) {
          Actual: ${slashSig}`);
 	}
 
-//	console.log('<DEBUG><oAuth><slash handler> request is', req.body);
+	//	console.log('<DEBUG><oAuth><slash handler> request is', req.body);
 
 	// Check if the requesting team / user is already in the DB
 	redis.get(req.body.team_id).then((auth) => {
@@ -228,13 +235,15 @@ app.get('/install', (req, res) => {
 		//Storing the team ID in redis so we can verify the app by team token
 		//key value pair - team id, auth snippet
 		let setAuth = auth => redis.set(auth.team_id, auth)
-		let testAuth = auth => {
+		let testAuth = auth => //{
 			webClientAuth.auth.test({
 				token: auth.access_token
-			}).then((res) => {
+			});
+		/*	}).then((res) => {
 				console.log('<Loading> Bot connected to workspace', res.team);
-			}).catch(console.error);
-		}
+				return res;
+			}).catch(console.error);*/
+	//	}
 		let args = {
 			client_id: process.env.SLACK_CLIENT_ID,
 			client_secret: process.env.SLACK_CLIENT_SECRET,
