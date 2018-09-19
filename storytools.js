@@ -815,11 +815,11 @@ exports.adminMenu = (body) => {
 
 // Handle the admin menu callbacks
 exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
-	console.log('<DEBUG><adminCallback> called with payload.actions[0].value:', payload.actions[0].value);
+	console.log('<DEBUG><adminCallback> called with payload.actions[0].value:', payload);
 	switch (payload.actions[0].value) {
 		case 'Triggers':
 			{
-				let triggerKeys = Object.keys(scriptConfig.config);
+				let triggerKeys = scriptConfig.getConfig(payload.team.id).keys;
 
 				if (triggerKeys.length > 0) {
 					let attachments = [];
@@ -894,7 +894,7 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 		case 'Reload Config':
 			{
 				// calling this with nulls to use existing sheet values
-				scriptConfig.loadConfig().catch(console.error);
+				scriptConfig.loadConfig(payload.team.id).catch(console.error);
 
 				respond({
 					text: "OK! I'm re-loading!",
@@ -922,6 +922,17 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 				// Get the Slack Web API client for the user's token
 				let webClientUser = getWebClient(access_token);
 
+				// TODO janky, fix eventually
+				console.log('payload.team.id:',payload.team.id);
+				let config = scriptConfig.getConfig(payload.team.id);
+			
+				let gsheetID = '', clientEmail = '', privateKey = '';
+				if (config) {
+					gsheetID = config.googleData.gsheetID;
+					clientEmail = config.googleData.clientEmail;
+					privateKey = config.googleData.privateKey;
+				}
+
 				const configDialog = {
 					callback_id: 'callback_config',
 					title: 'Configuration Menu',
@@ -931,7 +942,7 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 						max_length: 150,
 						hint: 'URL to the Google Sheet with the Config Info',
 						name: 'Google Sheet Link',
-						value: '',
+						value: gsheetID,
 						placeholder: '',
 						min_length: 0,
 						label: 'Google Sheet Link',
@@ -941,7 +952,7 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 						max_length: 150,
 						hint: 'Email address that the sheet is shared with',
 						name: 'Google API Email',
-						value: '',
+						value: clientEmail,
 						placeholder: '',
 						min_length: 0,
 						label: 'Google API Email',
@@ -951,7 +962,7 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 						max_length: 2000,
 						hint: 'Private key',
 						name: 'Google Private Key',
-						value: '',
+						value: privateKey,
 						placeholder: '',
 						min_length: 0,
 						label: 'Google Private Key',
@@ -971,7 +982,7 @@ exports.adminCallback = (access_token, payload, respond, scriptConfig) => {
 		case 'Create Channels':
 			{
 				console.log('<Debug><Creating Channels>');
-				createChannels(access_token, scriptConfig.config.Channels);
+				createChannels(access_token, scriptConfig.getConfig(payload.team.id).script.Channels);
 
 				respond({
 					text: "Creating channels now",
