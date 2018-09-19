@@ -12,7 +12,7 @@ const {
 
 // The main function that plays back a given trigger once it's matched
 // Takes the config for the specific trigger we are playing back, list of user tokens, and event data
-exports.playbackScript = (access_token, config, term, event) => {
+exports.playbackScript = (config, term, event) => {
 	// Get the Slack Web API client for the user's token
 	let tokens = config.scripts.Tokens;
 
@@ -31,7 +31,6 @@ exports.playbackScript = (access_token, config, term, event) => {
 		});
 		// TODO - what is this doing, are we sure we want to delete the triggering item in these cases?
 	} else if (!config.scripts[term][0].delete_trigger && !(config.scripts[term][0].type == 'reply' && config.scripts[term][0].target_item === 'trigger')) {
-
 		// Make it easy to cleanup the trigger term
 		addHistory(config, trigger_term, {
 			item: -1,
@@ -46,7 +45,6 @@ exports.playbackScript = (access_token, config, term, event) => {
 
 		// Ignore blank lines that may have been ingested for some reason 
 		if (action.type) {
-
 			//Clean up a fake slash command or other item that has `delete_trigger` set
 			if (action.delete_trigger) {
 				config.webClientUser.chat.delete({
@@ -82,10 +80,8 @@ exports.playbackScript = (access_token, config, term, event) => {
 						}
 					}
 
-
 					// As long as we aren't in prototype mode, this is the real stuff
 					if (!(action.type === 'botuser')) {
-
 						// Set targets for the actions that need them - reply, reaction, share, and files in a thread
 						if (action.type === 'reply' || action.type === 'reaction' || action.type === 'share' || ((action.type === 'file') && action.target_item)) {
 							// If these are manually specified, set them directly (used for sharing existing messages)
@@ -216,7 +212,6 @@ exports.playbackScript = (access_token, config, term, event) => {
 								}
 							case 'reaction':
 								{
-									console.log('reactions.add target_ts:',target_ts,'target_channel:',target_channel);
 									config.webClientUser.reactions.add({
 										token: tokens.find(o => o.name === action.username).token,
 										as_user: true,
@@ -524,10 +519,7 @@ exports.playbackScript = (access_token, config, term, event) => {
 }
 
 // Process a match from the dynamic callback sheet
-exports.callbackMatch = (access_token, payload, respond, config, callback) => {
-	// Get the Slack Web API client for the user's token
-	//let webClientUser = getWebClient(access_token);
-
+exports.callbackMatch = (payload, respond, config, callback) => {
 	console.log('<DEBUG><callbackMatch> Starting callback match for', callback.callback_name);
 
 	let response = {
@@ -541,9 +533,7 @@ exports.callbackMatch = (access_token, payload, respond, config, callback) => {
 		callback.attachments = callback.attachments.replace(/}$/, '');
 	}
 
-
 	// Check for some of the options for a Callback - these can be combined together
-
 	// Dialog response to callback is true
 	if (callback.dialog) {
 		response = {
@@ -661,10 +651,7 @@ exports.callbackMatch = (access_token, payload, respond, config, callback) => {
 }
 
 // Delete something from the history
-const deleteHistoryItem = (config, access_token, term) => {
-
-	// Get the Slack Web API client for the user's token
-	//	let webClientUser = getWebClient(access_token);
+const deleteHistoryItem = (config, term) => {
 
 	if (!config.message_history[term]) {
 		console.log('<Error><deleteHistoryItem> Well this is embarassing:' + term + "doesn't exist in history");
@@ -726,11 +713,8 @@ const deleteHistoryItem = (config, access_token, term) => {
 exports.adminMenu = (body) => {
 
 	const {
-		//	token,
 		text,
 		response_url,
-		//	trigger_id,
-		//	command
 	} = body;
 
 	//Build the admin menu for the bot
@@ -796,21 +780,13 @@ exports.adminMenu = (body) => {
 }
 
 // Handle the admin menu callbacks
-exports.adminCallback = (access_token, payload, respond, configTools) => {
-	//console.log('<DEBUG><adminCallback> called with payload.actions[0].value:', payload);
+exports.adminCallback = (payload, respond, configTools) => {
 	let config = configTools.getConfig(payload.team.id);
 
-	// This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
-	//l ets just create a new webclient so we can get to the config menu stuff
-	if (!config) {
-		configTools.createWebClient(payload.team.id, access_token);
-		config = configTools.getConfig(payload.team.id);
-	}
 	switch (payload.actions[0].value) {
 		case 'Triggers':
 			{
 				//let triggerKeys = config.keys;
-
 				if (config.keys.length > 0) {
 					let attachments = [];
 					let key_list = ""
@@ -897,7 +873,7 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 			}
 		case 'Cleanup All':
 			{
-				let msg = deleteAllHistory(config, access_token);
+				let msg = deleteAllHistory(config);
 				respond({
 					text: msg,
 					replace_original: true,
@@ -909,12 +885,8 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 			}
 		case 'Config':
 			{
-				// Get the Slack Web API client for the user's token
-				//	let webClientUser = getWebClient(access_token);
-
 				// TODO janky, fix eventually
 				console.log('Config request for team', payload.team.id);
-			//	let config = configTools.getConfig(payload.team.id);
 
 				let gsheetID = '',
 					clientEmail = '',
@@ -974,7 +946,7 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 		case 'Create Channels':
 			{
 				console.log('<Debug><Creating Channels>');
-				createChannels(access_token, configTools.getConfig(payload.team.id).script.Channels);
+				createChannels(configTools.getConfig(payload.team.id).script.Channels);
 
 				respond({
 					text: "Creating channels now",
@@ -997,9 +969,6 @@ exports.adminCallback = (access_token, payload, respond, configTools) => {
 				break;
 			}
 	}
-	// Send back something immediately
-	// TODO - response prob isn't anything, right?
-	respond(response).catch(console.error);
 }
 
 //
@@ -1024,15 +993,14 @@ const addHistory = (config, term, data) => {
 }
 
 // Burn it all down
-const deleteAllHistory = (config, access_token) => {
+const deleteAllHistory = (config) => {
 	let historyKeys = Object.keys(config.message_history);
-	//	console.log('<DEBUG> Time to delete all history with keys', historyKeys);
 	if (!(historyKeys.length > 0)) {
 		console.log('<History> No history to delete!');
 		return "No history to delete!";
 	} else {
 		historyKeys.forEach(function(key) {
-			deleteHistoryItem(config, access_token, key);
+			deleteHistoryItem(config, key);
 		});
 		return "All history deleted";
 	}
@@ -1040,12 +1008,8 @@ const deleteAllHistory = (config, access_token) => {
 
 // Delete a message (or, if it's the first message in a thread, delete the whole thread)
 // This is used with an event subscription to delete things that might not already be in the history
-exports.deleteItem = (access_token, channel, ts) => {
-
-	// Get the Slack Web API client for the user's token
-	//	let webClientUser = getWebClient(access_token);
-
-	// Get a list of any thread replies to delete as well
+exports.deleteItem = (config, channel, ts) => {
+// Get a list of any thread replies to delete as well
 	config.webClientUser.channels.replies({
 		channel: channel,
 		thread_ts: ts
@@ -1067,7 +1031,6 @@ const buildUserList = (config) => {
 	config.webClientUser.users.list()
 		.then((res) => {
 			config.user_list = res.members;
-			//		console.log('debug user list:',user_list);
 		}).catch((err) => {
 			console.error('<Error><buildUserList><users.list>', err);
 		});
@@ -1091,7 +1054,6 @@ const buildChannelList = (config) => {
 		})
 		.then((res) => {
 			config.channel_list = res.channels;
-			//		console.log('debug channel list:',channel_list);
 		})
 		.catch((err) => {
 			console.error('<Error><buildChannelListm><channels.list>', err);
@@ -1177,8 +1139,8 @@ const createChannels = (channelInfo) => {
 }
 
 // Clean up the history when a specific history term is being cleaned
-exports.historyCleanup = (config, access_token, payload, respond) => {
-	let msg = deleteHistoryItem(config, access_token, payload.actions[0].value);
+exports.historyCleanup = (config, payload, respond) => {
+	let msg = deleteHistoryItem(config, payload.actions[0].value);
 
 	response = {
 		text: msg,
@@ -1189,36 +1151,10 @@ exports.historyCleanup = (config, access_token, payload, respond) => {
 }
 
 // Do the initial work to make sure there's a valid connection, cache users and channels
-exports.validateBotConnection = () => {
-	// Start up with the Bot's token
-	let webClientBot = new WebClient(process.env.SLACK_BOT_TOKEN);
-
-	webClientBot.auth.test()
-		.then((res) => {
-			console.log('<DEBUG>auth result is', res);
-			const {
-				team,
-				user_id
-			} = res;
-			console.log('<Loading> Bot connected to workspace', team);
-
-			// Cache info on the users for ID translation and inviting to channels
-			// TODO - make this the bot's ID so it's excluded?
-			buildUserList(webClientBot);
-			buildChannelList(webClientBot);
-		})
-		.catch((err) => {
-			console.error('<Error><validateBotConnection><auth.test>', err);
-		});
-}
-
-// Do the initial work to make sure there's a valid connection, cache users and channels
 exports.setupNewConfig = (config, team_id) => {
-	// Get the Slack Web API client for the user's token
-	//let webClientUser = getWebClient(team_id);
 	config.webClientUser.auth.test()
 		.then((res) => {
-			console.log('<DEBUG><setupNewConfig>auth result is', res);
+	//		console.log('<DEBUG><setupNewConfig>auth result is', res);
 			const {
 				team,
 				user_id
@@ -1231,6 +1167,6 @@ exports.setupNewConfig = (config, team_id) => {
 			buildChannelList(config);
 		})
 		.catch((err) => {
-			console.error('<Error><validateBotConnection><auth.test>', err);
+			console.error('<Error><vsetupNewConfig><auth.test>', err);
 		});
 }

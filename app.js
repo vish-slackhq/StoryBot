@@ -17,36 +17,41 @@ require('dotenv').config({
 
 // Fun with oAuth
 redis = require('./redis');
+// Create a new web client
+const {
+	WebClient
+} = require('@slack/client');
+const webClientAuth = new WebClient(process.env.SLACK_BOT_TOKEN);
+const qs = require('querystring');
 
 // Load the appropriate config file from Google Sheets
 var configTools = require('./load-conf-google');
 // Set up the Storybot tools - where the magic happens
 const storyBotTools = require('./storytools.js');
 
-//for testing purposes only
+//for testing purposes only - populating my dev org until we can get some DB persistence for the 3 google vars
 redis.get('T56FL0NGJ').then((auth) => {
-	console.log('redis results for team', auth.team_id, 'are', auth);
+//	console.log('redis results for team', auth.team_id, 'are', auth);
 	let configParams = null;
 	if (!auth.configParams) {
-		console.log('storing shit')
+	//	console.log('storing shit')
 		configParams = {
 			gsheetID: process.env.GSHEET_ID,
 			clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
 			privateKey: process.env.GOOGLE_PRIVATE_KEY
 		};
-	//	redis.set(auth.team_id, configParams);
+		//	redis.set(auth.team_id, configParams);
 	}
 	configTools.setConfig(auth.team_id, {
-			gsheetID: process.env.GSHEET_ID,
-			clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-			privateKey: process.env.GOOGLE_PRIVATE_KEY
-		});//auth.configParams || configParams);
+		gsheetID: process.env.GSHEET_ID,
+		clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
+		privateKey: process.env.GOOGLE_PRIVATE_KEY
+	}); //auth.configParams || configParams);
 	configTools.loadConfig(auth.team_id).catch(console.error);
 	configTools.createWebClient(auth.team_id, auth.access_token);
 	storyBotTools.setupNewConfig(configTools.getConfig(auth.team_id));
 });
-
-
+// end testing section
 
 // Express app server
 const http = require('http');
@@ -70,7 +75,6 @@ const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET, {
 // Initialize an Express application
 // NOTE: You must use a body parser for the urlencoded format before attaching the adapter
 const app = express();
-
 // Attach the adapter to the Express application as a middleware
 app.use('/slack/actions', slackInteractions.expressMiddleware());
 // Mount the event handler on a route
@@ -86,9 +90,7 @@ slackEvents.on('message', (event, body) => {
 			// Matched a trigger from a user so playback the story
 			let indexMatch = indexOfIgnoreCase(config.keys, event.text);
 			if (indexMatch >= 0) {
-				//	let config = configTools.getConfig(body.team_id);
-				//		storyBotTools.playbackScript(res.access_token, config.scripts[config.keys[indexMatch]], config.scripts.Tokens, event);
-				storyBotTools.playbackScript(auth.access_token, config, config.keys[indexMatch], event);
+				storyBotTools.playbackScript(config, config.keys[indexMatch], event);
 			}
 		}
 	}).catch(console.error);
@@ -97,13 +99,14 @@ slackEvents.on('message', (event, body) => {
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event, body) => {
 	redis.get(body.team_id).then((auth) => {
+		let config = configTools.getConfig(auth.team_id);
 		// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
 		if (event.reaction === 'skull') {
-			storyBotTools.deleteItem(auth.access_token, event.item.channel, event.item.ts);
+			storyBotTools.deleteItem(config, event.item.channel, event.item.ts);
 		} else {
 			// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
 			// Use a unique reacji vs one being used elsewhere in the scripts
-			if (configTools.getConfig(auth.team_id).keys.indexOf(':' + event.reaction + ':') >= 0) {
+			if (config.keys.indexOf(':' + event.reaction + ':') >= 0) {
 				// Need to pass some basic event details to mimic what happens with a real event
 				let reaction_event = {
 					channel: event.item.channel,
@@ -111,8 +114,7 @@ slackEvents.on('reaction_added', (event, body) => {
 					text: ':' + event.reaction + ':',
 					reaction: event.reaction
 				};
-				let config = configTools.getConfig(auth.team_id);
-				storyBotTools.playbackScript(auth.access_token, config, reaction_event.text, reaction_event);
+				storyBotTools.playbackScript(config, reaction_event.text, reaction_event);
 			}
 		}
 	}).catch(console.error);
@@ -124,10 +126,18 @@ slackEvents.on('error', console.error);
 // Look for matches for dynamic callbacks
 slackInteractions.action(/callback_/, (payload, respond) => {
 	redis.get(payload.team.id).then((auth) => {
+		let config = configTools.getConfig(auth.team_id);
+		// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
+		// lets just create a new webclient so we can get to the config menu stuff
+		if (!config) {
+			configTools.createWebClient(payload.team.id, auth.access_token);
+			config = configTools.getConfig(payload.team.id);
+		}
+
 		if (payload.callback_id === 'callback_history_cleanup') {
-			storyBotTools.historyCleanup(configTools.getConfig(auth.team_id), auth.access_token, payload, respond);
+			storyBotTools.historyCleanup(config, payload, respond);
 		} else if (payload.callback_id === 'callback_admin_menu') {
-			storyBotTools.adminCallback(auth.access_token, payload, respond, configTools);
+			storyBotTools.adminCallback(payload, respond, configTools);
 		} else if (payload.callback_id === 'callback_config') {
 			configTools.setConfig(auth.team_id, {
 				gsheetID: payload.submission['Google Sheet Link'],
@@ -135,12 +145,11 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 				privateKey: payload.submission['Google Private Key']
 			});
 			configTools.loadConfig(auth.team_id);
-			configTools.createWebClient(auth.team_id, auth.access_token);
-			storyBotTools.setupNewConfig(configTools.getConfig(auth.team_id));
+			//	configTools.createWebClient(auth.team_id, auth.access_token);
+			storyBotTools.setupNewConfig(config);
 		} else {
-			let config = configTools.getConfig(auth.team_id);
 			if (config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id)) {
-				storyBotTools.callbackMatch(auth.access_token, payload, respond, config, config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
+				storyBotTools.callbackMatch(payload, respond, config, config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
 			} else {
 				console.log('<Callback> No match in the config for', payload.callback_id);
 			}
@@ -179,24 +188,21 @@ app.post('/slack/commands', function(req, res) {
 	const mySignature = `v0=${hmac.digest(`hex`)}`;
 
 	if (mySignature == slashSig) {
-		console.log(`Success
-        Signature: ${mySignature}`);
+		//	console.log(`Success
+		//     Signature: ${mySignature}`);
 	} else {
-		console.log(`SIGNATURES DO NOT MATCH
-         Expected: ${mySignature}
-         Actual: ${slashSig}`);
+		//	console.log(`SIGNATURES DO NOT MATCH
+		//   Expected: ${mySignature}
+		// Actual: ${slashSig}`);
 	}
 
 	//	console.log('<DEBUG><oAuth><slash handler> request is', req.body);
-
 	// Check if the requesting team / user is already in the DB
 	redis.get(req.body.team_id).then((auth) => {
-		console.log('<DEBUG><oAuth><slash handler> team_id lookup result is', auth);
-
+		//console.log('<DEBUG><oAuth><slash handler> team_id lookup result is', auth);
 		if (command === '/storybot') {
 			storyBotTools.adminMenu(req.body);
 		} else {
-			//let keys = configTools.getConfig(req.body.team_id).keys;
 			let config = configTools.getConfig(auth.team_id);
 			// Look if there's a trigger for a fake slash command and use it with a real slash command!
 			let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + args);
@@ -207,11 +213,9 @@ app.post('/slack/commands', function(req, res) {
 					text: command + ' ' + args,
 					ts: 'slash',
 				};
-
 				// When matching a slash command, no need to delete the trigger as if it was a fake text command
-				//	let config = configTools.getConfig(req.body.team_id);
 				config.scripts[config.keys[indexMatch]][0].delete_trigger = null;
-				storyBotTools.playbackScript(auth.access_token, config, config.keys[indexMatch], slash_event);
+				storyBotTools.playbackScript(config, config.keys[indexMatch], slash_event);
 			} else {
 				console.error('<Slash Command> No matching command');
 			}
@@ -219,13 +223,6 @@ app.post('/slack/commands', function(req, res) {
 	}).catch(console.error);
 });
 
-
-// Create a new web client
-const {
-	WebClient
-} = require('@slack/client');
-const webClientAuth = new WebClient(process.env.SLACK_BOT_TOKEN);
-const qs = require('querystring');
 // OAuth Handler - this URL is connected through https://myURL/intstall in the Oauth and Permissions page
 // Usually the URL is your ngrok redirect until the app gets moved to where ever you would like to host it!
 app.get('/install', (req, res) => {
@@ -243,7 +240,7 @@ app.get('/install', (req, res) => {
 				console.log('<Loading> Bot connected to workspace', res.team);
 				return res;
 			}).catch(console.error);*/
-	//	}
+		//	}
 		let args = {
 			client_id: process.env.SLACK_CLIENT_ID,
 			client_secret: process.env.SLACK_CLIENT_SECRET,
@@ -269,7 +266,6 @@ const port = process.env.PORT || 3000;
 // Start the express application server
 http.createServer(app).listen(port, () => {
 	console.log(`<Startup> server listening on port ${port}`);
-	//storyBotTools.validateBotConnection();
 });
 
 //

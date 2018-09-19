@@ -35,13 +35,11 @@ exports.getConfig = (team_id) => {
 
 // Load config
 exports.loadConfig = (team_id) => {
-  // console.log('<DEBUG><Config><loadConfig> Loading for team',team_id, 'with googleData:', allConfigs[team_id].googleData);
   return new Promise((resolve) => {
     extractGSheet.extractSheets({
       // your google spreadhsheet key 
       spreadsheetKey: allConfigs[team_id].configParams.gsheetID, // || process.env.GSHEET_ID,
       // your google oauth2 credentials 
-      //   credentials: require(process.env.GOOGLE_API_CREDS || './google_sheets_creds.json'),
       credentials: {
         client_email: allConfigs[team_id].configParams.clientEmail, // || process.env.GOOGLE_CLIENT_EMAIL,
         private_key: allConfigs[team_id].configParams.privateKey, // || process.env.GOOGLE_PRIVATE_KEY
@@ -52,9 +50,6 @@ exports.loadConfig = (team_id) => {
       if (err) {
         console.log(err);
       }
-      //   exports.config = data;
-      //   exports.triggerKeys = Object.keys(data);
-      //      console.log('<Loading> Loaded config for keys:', exports.triggerKeys);
       allConfigs[team_id].scripts = data;
       allConfigs[team_id].keys = Object.keys(allConfigs[team_id].scripts);
       console.log('<Loading> Loaded config for team', team_id, 'with keys:', allConfigs[team_id].keys);
@@ -65,15 +60,16 @@ exports.loadConfig = (team_id) => {
 
 // jank jank jank
 exports.createWebClient = (team_id, access_token) => {
-  console.log('<WEB CLIENT> Request for team', team_id);
+//  console.log('<WEB CLIENT> Request for team', team_id);
   if (!allConfigs[team_id]) {
     allConfigs[team_id] = {};
     allConfigs[team_id].message_history = [];
+    allConfigs[team_id].keys = [];
   }
   if (!allConfigs[team_id].webClientUser) {
-    console.log('<WEB CLIENT> Creating a new client');
+  //  console.log('<WEB CLIENT> Creating a new client');
     allConfigs[team_id].webClientUser = new WebClient(access_token);
   } else {
-    console.log('<WEB CLIENT> Found an existing client');
+  //  console.log('<WEB CLIENT> Found an existing client');
   }
 }
