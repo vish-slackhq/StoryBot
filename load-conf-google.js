@@ -127,3 +127,27 @@ const buildUserList = (team_id) => {
       console.error('<Error><buildUserList><users.list>', err);
     });
 }
+
+exports.addTriggerToConfig = (team_id, data) => {
+  console.log('<add trigger> Adding a new trigger for team', team_id, 'with data:', data);
+  let newTrigger = {
+    //   data['Trigger Name']: [{
+    // 'hey': [{
+    item: 0,
+    type: data['Type'],
+    text: data['Text'],
+   username: data['Username'],
+   channel: 'current',
+    attachments: data['Attachments'],
+    delete_trigger: false
+  }
+  //]
+  //  }
+  console.log('Lets see if this looks like JSON:', newTrigger);
+  allConfigs[team_id].scripts[data['Trigger Name']] = [newTrigger];
+  allConfigs[team_id].keys.push(data['Trigger Name']);
+  console.log('keys are', allConfigs[team_id].keys);
+
+
+  // console.log('<add trigger> .scripts is currently', allConfigs[team_id].scripts);
+}

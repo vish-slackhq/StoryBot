@@ -182,7 +182,7 @@ exports.playbackScript = (config, term, event) => {
 												});
 											})
 											.catch((err) => {
-												console.error('<Error><Main Loop><chat.postMessage>', err);
+												console.error('<Error><Main Loop><Bot chat.postMessage>', err);
 												nextItem();
 											});
 									} else {

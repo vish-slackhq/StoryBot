@@ -129,6 +129,9 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 					}
 				})).catch(console.error);
 				configTools.getConfig(auth.team_id, auth);
+			} else if (payload.callback_id === 'callback_add_trigger') {
+				console.log('<addtrigger> ok lets append this trigger');
+				configTools.addTriggerToConfig(auth.team_id, payload.submission);
 			} else {
 				if (config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id)) {
 					storyBotTools.callbackMatch(payload, respond, config, config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
@@ -159,9 +162,13 @@ app.use(bodyParser.json());
 app.post('/slack/commands', function(req, res) {
 	// respond immediately!
 	res.status(200).end();
-
-	let command = req.body.command;
-	let args = req.body.text;
+	const {
+		command,
+		text,
+		trigger_id
+	} = req.body;
+	//	let command = req.body.command;
+	//	let args = req.body.text;
 	const timeStamp = req.headers['x-slack-request-timestamp'];
 	const slashSig = req.headers['x-slack-signature'];
 	const reqBody = JSON.stringify(req.body);
@@ -184,16 +191,83 @@ app.post('/slack/commands', function(req, res) {
 		// Check if there's already a configuration and if not, this will set it up. If there are config params in the DB load them as well
 		configTools.getConfig(auth.team_id, auth).then((config) => {
 			if (command === '/storybot' || command === '/devstorybot') {
-				storyBotTools.adminMenu(req.body);
+				if (text === 'trigger') {
+					config.webClientUser.dialog.open({
+						trigger_id: trigger_id,
+						dialog: {
+							callback_id: 'callback_add_trigger',
+							title: 'Add Trigger',
+							submit_label: 'Submit',
+							elements: [{
+								optional: false,
+								max_length: 150,
+								hint: '',
+								name: 'Trigger Name',
+								value: '',
+								placeholder: '',
+								min_length: 0,
+								label: 'Trigger Name',
+								type: 'text'
+							}, {
+								type: 'select',
+								label: 'Type',
+								name: 'Type',
+								hint: '',
+								optional: false,
+								options: [{
+									value: 'message',
+									label: 'message'
+								}, {
+									value: 'bot',
+									label: 'bot message'
+								}]
+							}, {
+								optional: true,
+								max_length: 500,
+								hint: '',
+								name: 'Text',
+								value: '',
+								placeholder: '',
+								min_length: 0,
+								label: 'Text',
+								type: 'textarea'
+							}, {
+								optional: true,
+								max_length: 3000,
+								hint: '',
+								name: 'Attachments',
+								value: '',
+								placeholder: '',
+								min_length: 0,
+								label: 'Attachments',
+								type: 'textarea'
+							}, {
+								optional: true,
+								max_length: 150,
+								hint: '',
+								name: 'Username',
+								value: '',
+								placeholder: '',
+								min_length: 0,
+								label: 'Username',
+								type: 'text'
+							}]
+						}
+					}).catch((err) => {
+						console.log('<Error><Admin Menu><Config dialog.open>', err);
+					});
+				} else {
+					storyBotTools.adminMenu(req.body);
+				}
 			} else {
 				//	let config = configTools.getConfig(auth.team_id);
 				// Look if there's a trigger for a fake slash command and use it with a real slash command!
-				let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + args);
+				let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + text);
 				if (indexMatch >= 0) {
 					let slash_event = {
 						user: req.body.user_id,
 						channel: req.body.channel_id,
-						text: command + ' ' + args,
+						text: command + ' ' + text,
 						ts: 'slash',
 					};
 					// When matching a slash command, no need to delete the trigger as if it was a fake text command
