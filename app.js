@@ -63,7 +63,15 @@ slackEvents.on('message', (event, body) => {
 		// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
 		// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
 		if (event.type === 'message' && !event.subtype && !event.bot_id) {
+			// Check if there's already a configuration
 			let config = configTools.getConfig(auth.team_id);
+			// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
+			// lets just create a new webclient so we can get to the config menu stuff
+			if (!config) {
+				console.log('<DEBUG><Load Config> No config detected running setupConfig');
+				config = configTools.setupConfig(auth);
+				storyBotTools.setupNewConfig(config);
+			}
 			// Matched a trigger from a user so playback the story
 			let indexMatch = indexOfIgnoreCase(config.keys, event.text);
 			if (indexMatch >= 0) {
@@ -86,10 +94,9 @@ slackEvents.on('reaction_added', (event, body) => {
 			// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
 			// lets just create a new webclient so we can get to the config menu stuff
 			if (!config) {
+				console.log('<DEBUG><Load Config> No config detected running setupConfig');
 				config = configTools.setupConfig(auth);
-				configTools.loadConfig(auth.team_id).then((res) => {
-					storyBotTools.setupNewConfig(config);
-				}).catch(console.error);
+				storyBotTools.setupNewConfig(config);
 			}
 			// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
 			// Use a unique reacji vs one being used elsewhere in the scripts
@@ -118,6 +125,7 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 		// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
 		// lets just create a new webclient so we can get to the config menu stuff
 		if (!config) {
+			console.log('<DEBUG><Load Config> No config detected running setupConfig');
 			config = configTools.setupConfig(auth);
 			storyBotTools.setupNewConfig(config);
 		}
@@ -127,7 +135,7 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 		} else if (payload.callback_id === 'callback_admin_menu') {
 			storyBotTools.adminCallback(payload, respond, configTools);
 		} else if (payload.callback_id === 'callback_config') {
-			configTools.setConfig(auth.team_id, {
+			configTools.setConfig(auth, {
 				gsheetID: payload.submission['Google Sheet Link'],
 				clientEmail: payload.submission['Google API Email'],
 				privateKey: payload.submission['Google Private Key']
@@ -191,6 +199,7 @@ app.post('/slack/commands', function(req, res) {
 		// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
 		// lets just create a new webclient so we can get to the config menu stuff
 		if (!config) {
+			console.log('<DEBUG><Load Config> No config detected running setupConfig');
 			config = configTools.setupConfig(auth);
 			storyBotTools.setupNewConfig(config);
 		}

@@ -10,25 +10,29 @@ const {
   WebClient
 } = require('@slack/client');
 // Fun with oAuth
-//redis = require('./redis');
+redis = require('./redis');
 
 var allConfigs = [];
 
-exports.setConfig = (team_id, args) => {
-  
+// Set the config parameters and store them in the DB
+exports.setConfig = (auth, args) => {
   // Allow full URLs
   let match = args.gsheetID.match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
   if (match) {
     args.gsheetID = match[0];
   }
 
-  allConfigs[team_id].configParams = {
+  allConfigs[auth.team_id].configParams = {
     gsheetID: args.gsheetID,
     clientEmail: args.clientEmail,
     privateKey: args.privateKey
   }
+  redis.set(auth.team_id, Object.assign(auth, {
+    configParams: allConfigs[auth.team_id].configParams
+  }));
 }
 
+// Return the requested config
 exports.getConfig = (team_id) => {
   if (allConfigs[team_id]) {
     return allConfigs[team_id];
@@ -37,7 +41,11 @@ exports.getConfig = (team_id) => {
   }
 }
 
+// Initial check - will return the config if it exists or set it up if it doesnt
+// in between - if there's no config entry but there are stored configParams, set them up so the config can be loaded
 exports.setupConfig = (data) => {
+
+// If the config doesn't have an entry, create a new blank one
   if (!allConfigs[data.team_id]) {
     allConfigs[data.team_id] = {};
     allConfigs[data.team_id].message_history = [];
@@ -45,16 +53,17 @@ exports.setupConfig = (data) => {
     allConfigs[data.team_id].configParams = {};
   }
 
+  console.log('setupConfig ... data.configParams is', data.configParams);
+  // If there are stored config paramters, set them and load the config
+  if (data.configParams) {
+    allConfigs[data.team_id].configParams = data.configParams;
+    exports.loadConfig(data.team_id);
+  }
+
+  // create a new web client for the team
   if (!allConfigs[data.team_id].webClientUser) {
     allConfigs[data.team_id].webClientUser = new WebClient(data.access_token);
   }
-
-console.log('setupConfig ... data.configParams is',data.configParams);
-// If there are stored config paramters, set them and load the config
-  if(data.configParams) {
-    allConfigs[data.team_id].configParams = data.configParams;
-    //exports.loadConfig(data.team_id);
-  } 
 
   return allConfigs[data.team_id];
 }
@@ -77,7 +86,7 @@ exports.loadConfig = (team_id) => {
         console.log(err);
       }
       allConfigs[team_id].scripts = data;
-      allConfigs[team_id].keys = Object.keys(allConfigs[team_id].scripts);
+      allConfigs[team_id].keys = Object.keys(data);
       console.log('<Loading> Loaded config for team', team_id, 'with keys:', allConfigs[team_id].keys);
       resolve(data);
     });
