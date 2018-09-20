@@ -184,7 +184,11 @@ app.post('/slack/commands', function(req, res) {
 		// Check if there's already a configuration and if not, this will set it up. If there are config params in the DB load them as well
 		configTools.getConfig(auth.team_id, auth).then((config) => {
 			if (command === '/storybot' || command === '/devstorybot') {
+				if (args === 'set') {
+					config.message_history = [];
+				} else {
 				storyBotTools.adminMenu(req.body);
+			}
 			} else {
 				//	let config = configTools.getConfig(auth.team_id);
 				// Look if there's a trigger for a fake slash command and use it with a real slash command!
