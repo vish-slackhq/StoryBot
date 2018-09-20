@@ -781,194 +781,195 @@ exports.adminMenu = (body) => {
 
 // Handle the admin menu callbacks
 exports.adminCallback = (payload, respond, configTools) => {
-	let config = configTools.getConfig(payload.team.id);
+	configTools.getConfig(payload.team.id).then((config) => {
+	//	console.log('adminCallback config is!', config);
+		switch (payload.actions[0].value) {
+			case 'Triggers':
+				{
+					//let triggerKeys = config.keys;
+					if (config.keys.length > 0) {
+						let attachments = [];
+						let key_list = ""
+						config.keys.forEach(function(key) {
+							if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks')) {
+								key_list = key_list + " \`" + key + "\`";
+							}
+						});
 
-	switch (payload.actions[0].value) {
-		case 'Triggers':
-			{
-				//let triggerKeys = config.keys;
-				if (config.keys.length > 0) {
-					let attachments = [];
-					let key_list = ""
-					config.keys.forEach(function(key) {
-						if (!(key === 'Tokens' || key === 'Channels' || key === 'Callbacks')) {
-							key_list = key_list + " \`" + key + "\`";
-						}
-					});
+						attachments.push({
+							fields: [{
+								value: key_list,
+								short: false
+							}],
+							title: "These are the triggers for the story:",
+							mrkdwn_in: ['text', 'fields']
+						});
 
-					attachments.push({
-						fields: [{
-							value: key_list,
-							short: false
-						}],
-						title: "These are the triggers for the story:",
-						mrkdwn_in: ['text', 'fields']
+						respond({
+							response_type: 'ephemeral',
+							replace_original: true,
+							attachments: attachments
+						}).catch((err) => {
+							console.error('<Error><Admin Menu><Triggers>', err);
+						});
+					}
+					break;
+				}
+			case 'History':
+				{
+					console.log('<Admin Menu> History is:', config.message_history);
+					let response = {
+						response_type: 'ephemeral',
+						replace_original: true,
+						text: "No history right now"
+					}
+
+					let message_history_keys = Object.keys(config.message_history);
+
+					if (message_history_keys.length > 0) {
+						let attachments = [];
+						let actions = [];
+						message_history_keys.forEach(function(key) {
+							actions.push({
+								name: key,
+								text: key,
+								value: key,
+								type: 'button'
+							});
+						});
+
+						attachments.push({
+							actions: actions,
+							title: "These are the triggers you've run. Click to cleanup:",
+							mrkdwn_in: ['text', 'fields'],
+							callback_id: 'callback_history_cleanup'
+						});
+
+						response = {
+							response_type: 'ephemeral',
+							replace_original: true,
+							attachments: attachments
+						};
+					}
+
+					respond(response).catch((err) => {
+						console.error('<Error><Admin Menu><History>', err);
 					});
+					break;
+				}
+			case 'Reload Config':
+				{
+					// calling this with nulls to use existing sheet values
+					configTools.loadConfig(payload.team.id).catch(console.error);
 
 					respond({
+						text: "OK! I'm re-loading!",
 						response_type: 'ephemeral',
-						replace_original: true,
-						attachments: attachments
+						replace_original: true
 					}).catch((err) => {
-						console.error('<Error><Admin Menu><Triggers>', err);
+						console.error('<Error><Admin Menu><Reload Config>', err);
 					});
+					break;
 				}
-				break;
-			}
-		case 'History':
-			{
-				console.log('<Admin Menu> History is:', config.message_history);
-				let response = {
-					response_type: 'ephemeral',
-					replace_original: true,
-					text: "No history right now"
-				}
-
-				let message_history_keys = Object.keys(config.message_history);
-
-				if (message_history_keys.length > 0) {
-					let attachments = [];
-					let actions = [];
-					message_history_keys.forEach(function(key) {
-						actions.push({
-							name: key,
-							text: key,
-							value: key,
-							type: 'button'
-						});
-					});
-
-					attachments.push({
-						actions: actions,
-						title: "These are the triggers you've run. Click to cleanup:",
-						mrkdwn_in: ['text', 'fields'],
-						callback_id: 'callback_history_cleanup'
-					});
-
-					response = {
-						response_type: 'ephemeral',
+			case 'Cleanup All':
+				{
+					let msg = deleteAllHistory(config);
+					respond({
+						text: msg,
 						replace_original: true,
-						attachments: attachments
+						ephemeral: true
+					}).catch((err) => {
+						console.error('<Error><Admin Menu><Cleanup All>', err);
+					});
+					break;
+				}
+			case 'Config':
+				{
+					// TODO janky, fix eventually
+					console.log('Config request for team', payload.team.id);
+
+					let gsheetID = '',
+						clientEmail = '',
+						privateKey = '';
+					if (config.configParams) {
+						gsheetID = config.configParams.gsheetID;
+						clientEmail = config.configParams.clientEmail;
+						privateKey = config.configParams.privateKey;
+					}
+
+					const configDialog = {
+						callback_id: 'callback_config',
+						title: 'Configuration Menu',
+						submit_label: 'Submit',
+						elements: [{
+							optional: false,
+							max_length: 150,
+							hint: 'URL to the Google Sheet with the Config Info',
+							name: 'Google Sheet Link',
+							value: gsheetID,
+							placeholder: '',
+							min_length: 0,
+							label: 'Google Sheet Link',
+							type: 'text'
+						}, {
+							optional: false,
+							max_length: 150,
+							hint: 'Email address that the sheet is shared with',
+							name: 'Google API Email',
+							value: clientEmail,
+							placeholder: '',
+							min_length: 0,
+							label: 'Google API Email',
+							type: 'text'
+						}, {
+							optional: false,
+							max_length: 2000,
+							hint: 'Private key',
+							name: 'Google Private Key',
+							value: privateKey,
+							placeholder: '',
+							min_length: 0,
+							label: 'Google Private Key',
+							type: 'textarea'
+						}]
 					};
+
+					config.webClientUser.dialog.open({
+						trigger_id: payload.trigger_id,
+						dialog: configDialog
+					}).catch((err) => {
+						console.log('<Error><Admin Menu><Config dialog.open>', err);
+					});
+
+					break;
 				}
+			case 'Create Channels':
+				{
+					console.log('<Debug><Creating Channels>');
+					createChannels(configTools.getConfig(payload.team.id).script.Channels);
 
-				respond(response).catch((err) => {
-					console.error('<Error><Admin Menu><History>', err);
-				});
-				break;
-			}
-		case 'Reload Config':
-			{
-				// calling this with nulls to use existing sheet values
-				configTools.loadConfig(payload.team.id).catch(console.error);
-
-				respond({
-					text: "OK! I'm re-loading!",
-					response_type: 'ephemeral',
-					replace_original: true
-				}).catch((err) => {
-					console.error('<Error><Admin Menu><Reload Config>', err);
-				});
-				break;
-			}
-		case 'Cleanup All':
-			{
-				let msg = deleteAllHistory(config);
-				respond({
-					text: msg,
-					replace_original: true,
-					ephemeral: true
-				}).catch((err) => {
-					console.error('<Error><Admin Menu><Cleanup All>', err);
-				});
-				break;
-			}
-		case 'Config':
-			{
-				// TODO janky, fix eventually
-				console.log('Config request for team', payload.team.id);
-
-				let gsheetID = '',
-					clientEmail = '',
-					privateKey = '';
-				if (config.configParams) {
-					gsheetID = config.configParams.gsheetID;
-					clientEmail = config.configParams.clientEmail;
-					privateKey = config.configParams.privateKey;
+					respond({
+						text: "Creating channels now",
+						response_type: 'ephemeral',
+						replace_original: true
+					}).catch((err) => {
+						console.error('<Error><Admin Menu><Create Channels>', err);
+					});
+					break;
 				}
-
-				const configDialog = {
-					callback_id: 'callback_config',
-					title: 'Configuration Menu',
-					submit_label: 'Submit',
-					elements: [{
-						optional: false,
-						max_length: 150,
-						hint: 'URL to the Google Sheet with the Config Info',
-						name: 'Google Sheet Link',
-						value: gsheetID,
-						placeholder: '',
-						min_length: 0,
-						label: 'Google Sheet Link',
-						type: 'text'
-					}, {
-						optional: false,
-						max_length: 150,
-						hint: 'Email address that the sheet is shared with',
-						name: 'Google API Email',
-						value: clientEmail,
-						placeholder: '',
-						min_length: 0,
-						label: 'Google API Email',
-						type: 'text'
-					}, {
-						optional: false,
-						max_length: 2000,
-						hint: 'Private key',
-						name: 'Google Private Key',
-						value: privateKey,
-						placeholder: '',
-						min_length: 0,
-						label: 'Google Private Key',
-						type: 'textarea'
-					}]
-				};
-
-				config.webClientUser.dialog.open({
-					trigger_id: payload.trigger_id,
-					dialog: configDialog
-				}).catch((err) => {
-					console.log('<Error><Admin Menu><Config dialog.open>', err);
-				});
-
-				break;
-			}
-		case 'Create Channels':
-			{
-				console.log('<Debug><Creating Channels>');
-				createChannels(configTools.getConfig(payload.team.id).script.Channels);
-
-				respond({
-					text: "Creating channels now",
-					response_type: 'ephemeral',
-					replace_original: true
-				}).catch((err) => {
-					console.error('<Error><Admin Menu><Create Channels>', err);
-				});
-				break;
-			}
-		default:
-			{
-				respond({
-					text: ":thinking_face: Not sure how that happened",
-					replace_original: true,
-					ephemeral: true
-				}).catch((err) => {
-					console.error('<Error><Admin Menu><Default>', err);
-				});
-				break;
-			}
-	}
+			default:
+				{
+					respond({
+						text: ":thinking_face: Not sure how that happened",
+						replace_original: true,
+						ephemeral: true
+					}).catch((err) => {
+						console.error('<Error><Admin Menu><Default>', err);
+					});
+					break;
+				}
+		}
+	});
 }
 
 //
@@ -1009,7 +1010,7 @@ const deleteAllHistory = (config) => {
 // Delete a message (or, if it's the first message in a thread, delete the whole thread)
 // This is used with an event subscription to delete things that might not already be in the history
 exports.deleteItem = (webClient, channel, ts) => {
-// Get a list of any thread replies to delete as well
+	// Get a list of any thread replies to delete as well
 	webClient.channels.replies({
 		channel: channel,
 		thread_ts: ts
@@ -1025,17 +1026,6 @@ exports.deleteItem = (webClient, channel, ts) => {
 	});
 }
 
-// TODO - put these as helpers in the config?
-// Get the list of all users and their IDs and store it for faster caching
-const buildUserList = (config) => {
-	config.webClientUser.users.list()
-		.then((res) => {
-			config.user_list = res.members;
-		}).catch((err) => {
-			console.error('<Error><buildUserList><users.list>', err);
-		});
-}
-
 // Look up User ID from a Name
 const getUserId = (config, name) => {
 	//remove any spaces in the names being passed
@@ -1043,21 +1033,6 @@ const getUserId = (config, name) => {
 	// TODO	let id = user_list.find(o => o.name === name).id;
 	// TODO	return id;
 	return config.user_list.find(o => o.name === name).id
-}
-
-// Get the list of all channels and their IDs and cache it
-const buildChannelList = (config) => {
-	config.webClientUser.channels.list({
-			exclude_members: true,
-			exclude_archived: true,
-			get_private: true
-		})
-		.then((res) => {
-			config.channel_list = res.channels;
-		})
-		.catch((err) => {
-			console.error('<Error><buildChannelListm><channels.list>', err);
-		});
 }
 
 // Look up Channel ID from a Name
@@ -1148,20 +1123,4 @@ exports.historyCleanup = (config, payload, respond) => {
 		ephemeral: true
 	};
 	respond(response).catch(console.error);
-}
-
-// Do the initial work to make sure there's a valid connection, cache users and channels
-exports.setupNewConfig = (config) => {
-	config.webClientUser.auth.test()
-		.then((res) => {
-			console.log('<Loading> Bot connected to workspace', res.team);
-
-			// Cache info on the users for ID translation and inviting to channels
-			// TODO - make this the bot's ID so it's excluded?
-			buildUserList(config);
-			buildChannelList(config);
-		})
-		.catch((err) => {
-			console.error('<Error><vsetupNewConfig><auth.test>', err);
-		});
 }

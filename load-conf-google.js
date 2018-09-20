@@ -10,67 +10,61 @@ const {
   WebClient
 } = require('@slack/client');
 // Fun with oAuth
-redis = require('./redis');
+//redis = require('./redis');
 
 var allConfigs = [];
 
-// Set the config parameters and store them in the DB
+/*
+// Store the config parameters in the DB
 exports.setConfig = (auth, args) => {
+  console.log('setConfig running for ', auth.team_id);
   // Allow full URLs
   let match = args.gsheetID.match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
   if (match) {
     args.gsheetID = match[0];
   }
 
-  allConfigs[auth.team_id].configParams = {
-    gsheetID: args.gsheetID,
-    clientEmail: args.clientEmail,
-    privateKey: args.privateKey
-  }
   redis.set(auth.team_id, Object.assign(auth, {
-    configParams: allConfigs[auth.team_id].configParams
+    configParams: {
+      gsheetID: args.gsheetID,
+      clientEmail: args.clientEmail,
+      privateKey: args.privateKey
+    }
   }));
 }
+*/
 
 // Return the requested config
-exports.getConfig = (team_id) => {
-  if (allConfigs[team_id]) {
-    return allConfigs[team_id];
-  } else {
-    return null;
-  }
-}
+exports.getConfig = (team_id, data) => {
+  return new Promise((resolve) => {
+    // If there isn't a config for the team, create a blank one
+    if (!allConfigs[team_id]) {
+      allConfigs[team_id] = {};
+      allConfigs[team_id].message_history = [];
+      allConfigs[team_id].keys = [];
+      allConfigs[team_id].configParams = {};
+    }
+    // If there are config params already stored, load them
+    if (data) {
+      // create a new web client for the team
+      if (!allConfigs[team_id].webClientUser) {
+        allConfigs[team_id].webClientUser = new WebClient(data.access_token);
+      }
 
-// Initial check - will return the config if it exists or set it up if it doesnt
-// in between - if there's no config entry but there are stored configParams, set them up so the config can be loaded
-exports.setupConfig = (data) => {
-
-// If the config doesn't have an entry, create a new blank one
-  if (!allConfigs[data.team_id]) {
-    allConfigs[data.team_id] = {};
-    allConfigs[data.team_id].message_history = [];
-    allConfigs[data.team_id].keys = [];
-    allConfigs[data.team_id].configParams = {};
-  }
-
-  console.log('setupConfig ... data.configParams is', data.configParams);
-  // If there are stored config paramters, set them and load the config
-  if (data.configParams) {
-    allConfigs[data.team_id].configParams = data.configParams;
-    exports.loadConfig(data.team_id);
-  }
-
-  // create a new web client for the team
-  if (!allConfigs[data.team_id].webClientUser) {
-    allConfigs[data.team_id].webClientUser = new WebClient(data.access_token);
-  }
-
-  return allConfigs[data.team_id];
+      if (data.configParams) {
+        if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.clientEmail === allConfigs[team_id].configParams.clientEmail && data.configParams.privateKey === allConfigs[team_id].configParams.privateKey)) {
+          allConfigs[team_id].configParams = data.configParams;
+          exports.loadConfig(team_id);
+        }
+      }
+    }
+    resolve(allConfigs[team_id]);
+  })
 }
 
 // Load config
 exports.loadConfig = (team_id) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     extractGSheet.extractSheets({
       // your google spreadhsheet key 
       spreadsheetKey: allConfigs[team_id].configParams.gsheetID, // || process.env.GSHEET_ID,
@@ -85,26 +79,51 @@ exports.loadConfig = (team_id) => {
       if (err) {
         console.log(err);
       }
-      allConfigs[team_id].scripts = data;
-      allConfigs[team_id].keys = Object.keys(data);
-      console.log('<Loading> Loaded config for team', team_id, 'with keys:', allConfigs[team_id].keys);
-      resolve(data);
-    });
+      if (data) {
+        allConfigs[team_id].scripts = data;
+        allConfigs[team_id].keys = Object.keys(data);
+        console.log('<Loading> Loaded config for team', team_id, 'with keys:', allConfigs[team_id].keys);
+
+        allConfigs[team_id].webClientUser.auth.test()
+          .then((res) => {
+            console.log('<Loading> Bot connected to workspace', res.team);
+            // Cache info on the users for ID translation and inviting to channels
+            buildUserList(team_id);
+            buildChannelList(team_id);
+          })
+          .catch((err) => {
+            console.error('<Error><vsetupNewConfig><auth.test>', err);
+          });
+        resolve(allConfigs[team_id]);
+      } else {
+        reject();
+      }
+    })
   })
 }
 
-// jank jank jank
-exports.createWebClient = (team_id, access_token) => {
-  //  console.log('<WEB CLIENT> Request for team', team_id);
-  /*   if (!allConfigs[team_id]) {
-       allConfigs[team_id] = {};
-       allConfigs[team_id].message_history = [];
-       allConfigs[team_id].keys = [];
-     }
-     if (!allConfigs[team_id].webClientUser) {
-       //  console.log('<WEB CLIENT> Creating a new client');*/
-  allConfigs[team_id].webClientUser = new WebClient(access_token);
-  //   } else {
-  //  console.log('<WEB CLIENT> Found an existing client');
-  // }
+// Get the list of all channels and their IDs and cache it
+const buildChannelList = (team_id) => {
+  allConfigs[team_id].webClientUser.channels.list({
+      exclude_members: true,
+      exclude_archived: true,
+      get_private: true
+    })
+    .then((res) => {
+      allConfigs[team_id].channel_list = res.channels;
+    })
+    .catch((err) => {
+      console.error('<Error><buildChannelListm><channels.list>', err);
+    });
+}
+
+// TODO - put these as helpers in the config?
+// Get the list of all users and their IDs and store it for faster caching
+const buildUserList = (team_id) => {
+  allConfigs[team_id].webClientUser.users.list()
+    .then((res) => {
+      allConfigs[team_id].user_list = res.members;
+    }).catch((err) => {
+      console.error('<Error><buildUserList><users.list>', err);
+    });
 }

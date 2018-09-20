@@ -63,20 +63,13 @@ slackEvents.on('message', (event, body) => {
 		// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
 		// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
 		if (event.type === 'message' && !event.subtype && !event.bot_id) {
-			// Check if there's already a configuration
-			let config = configTools.getConfig(auth.team_id);
-			// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
-			// lets just create a new webclient so we can get to the config menu stuff
-			if (!config) {
-				console.log('<DEBUG><Load Config> No config detected running setupConfig');
-				config = configTools.setupConfig(auth);
-				storyBotTools.setupNewConfig(config);
-			}
-			// Matched a trigger from a user so playback the story
-			let indexMatch = indexOfIgnoreCase(config.keys, event.text);
-			if (indexMatch >= 0) {
-				storyBotTools.playbackScript(config, config.keys[indexMatch], event);
-			}
+			configTools.getConfig(auth.team_id, auth).then((config) => {
+				// Matched a trigger from a user so playback the story
+				let indexMatch = indexOfIgnoreCase(config.keys, event.text);
+				if (indexMatch >= 0) {
+					storyBotTools.playbackScript(config, config.keys[indexMatch], event);
+				}
+			}).catch(console.error);
 		}
 	}).catch(console.error);
 });
@@ -84,32 +77,24 @@ slackEvents.on('message', (event, body) => {
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event, body) => {
 	redis.get(body.team_id).then((auth) => {
-		//	let config = configTools.getConfig(auth.team_id);
 		// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
 		if (event.reaction === 'skull') {
 			storyBotTools.deleteItem(new WebClient(auth.access_token), event.item.channel, event.item.ts);
 		} else {
-			// Check if there's already a configuration
-			let config = configTools.getConfig(auth.team_id);
-			// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
-			// lets just create a new webclient so we can get to the config menu stuff
-			if (!config) {
-				console.log('<DEBUG><Load Config> No config detected running setupConfig');
-				config = configTools.setupConfig(auth);
-				storyBotTools.setupNewConfig(config);
-			}
-			// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
-			// Use a unique reacji vs one being used elsewhere in the scripts
-			if (config.keys.indexOf(':' + event.reaction + ':') >= 0) {
-				// Need to pass some basic event details to mimic what happens with a real event
-				let reaction_event = {
-					channel: event.item.channel,
-					ts: event.item.ts,
-					text: ':' + event.reaction + ':',
-					reaction: event.reaction
-				};
-				storyBotTools.playbackScript(config, reaction_event.text, reaction_event);
-			}
+			configTools.getConfig(auth.team_id, auth).then((config) => {
+				// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
+				// Use a unique reacji vs one being used elsewhere in the scripts
+				if (config.keys.indexOf(':' + event.reaction + ':') >= 0) {
+					// Need to pass some basic event details to mimic what happens with a real event
+					let reaction_event = {
+						channel: event.item.channel,
+						ts: event.item.ts,
+						text: ':' + event.reaction + ':',
+						reaction: event.reaction
+					};
+					storyBotTools.playbackScript(config, reaction_event.text, reaction_event);
+				}
+			}).catch(console.error);
 		}
 	}).catch(console.error);
 });
@@ -120,36 +105,38 @@ slackEvents.on('error', console.error);
 // Look for matches for dynamic callbacks
 slackInteractions.action(/callback_/, (payload, respond) => {
 	redis.get(payload.team.id).then((auth) => {
-		// Check if there's already a configuration
-		let config = configTools.getConfig(auth.team_id);
-		// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
-		// lets just create a new webclient so we can get to the config menu stuff
-		if (!config) {
-			console.log('<DEBUG><Load Config> No config detected running setupConfig');
-			config = configTools.setupConfig(auth);
-			storyBotTools.setupNewConfig(config);
-		}
-
-		if (payload.callback_id === 'callback_history_cleanup') {
-			storyBotTools.historyCleanup(config, payload, respond);
-		} else if (payload.callback_id === 'callback_admin_menu') {
-			storyBotTools.adminCallback(payload, respond, configTools);
-		} else if (payload.callback_id === 'callback_config') {
-			configTools.setConfig(auth, {
-				gsheetID: payload.submission['Google Sheet Link'],
-				clientEmail: payload.submission['Google API Email'],
-				privateKey: payload.submission['Google Private Key']
-			});
-			configTools.loadConfig(auth.team_id);
-			//	configTools.createWebClient(auth.team_id, auth.access_token);
-			storyBotTools.setupNewConfig(config);
-		} else {
-			if (config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id)) {
-				storyBotTools.callbackMatch(payload, respond, config, config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
+		configTools.getConfig(auth.team_id, auth).then((config) => {
+			if (payload.callback_id === 'callback_history_cleanup') {
+				storyBotTools.historyCleanup(config, payload, respond);
+			} else if (payload.callback_id === 'callback_admin_menu') {
+				storyBotTools.adminCallback(payload, respond, configTools);
+			} else if (payload.callback_id === 'callback_config') {
+				/*configTools.setConfig(auth, {
+					gsheetID: payload.submission['Google Sheet Link'],
+					clientEmail: payload.submission['Google API Email'],
+					privateKey: payload.submission['Google Private Key']
+				});*/
+				// Allow full URLs
+				let match = payload.submission['Google Sheet Link'].match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
+				if (match) {
+					payload.submission['Google Sheet Link'] = match[0];
+				}
+				redis.set(auth.team_id, Object.assign(auth, {
+					configParams: {
+						gsheetID: payload.submission['Google Sheet Link'],
+						clientEmail: payload.submission['Google API Email'],
+						privateKey: payload.submission['Google Private Key']
+					}
+				})).catch(console.error);
+				configTools.getConfig(auth.team_id, auth);
 			} else {
-				console.log('<Callback> No match in the config for', payload.callback_id);
+				if (config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id)) {
+					storyBotTools.callbackMatch(payload, respond, config, config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
+				} else {
+					console.log('<Callback> No match in the config for', payload.callback_id);
+				}
 			}
-		}
+		}).catch(console.error);
 	}).catch(console.error);
 });
 
@@ -194,36 +181,29 @@ app.post('/slack/commands', function(req, res) {
 
 	// Check if the requesting team / user is already in the DB
 	redis.get(req.body.team_id).then((auth) => {
-		// Check if there's already a configuration
-		let config = configTools.getConfig(auth.team_id);
-		// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
-		// lets just create a new webclient so we can get to the config menu stuff
-		if (!config) {
-			console.log('<DEBUG><Load Config> No config detected running setupConfig');
-			config = configTools.setupConfig(auth);
-			storyBotTools.setupNewConfig(config);
-		}
-
-		if (command === '/storybot' || command === '/devstorybot') {
-			storyBotTools.adminMenu(req.body);
-		} else {
-			//	let config = configTools.getConfig(auth.team_id);
-			// Look if there's a trigger for a fake slash command and use it with a real slash command!
-			let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + args);
-			if (indexMatch >= 0) {
-				let slash_event = {
-					user: req.body.user_id,
-					channel: req.body.channel_id,
-					text: command + ' ' + args,
-					ts: 'slash',
-				};
-				// When matching a slash command, no need to delete the trigger as if it was a fake text command
-				config.scripts[config.keys[indexMatch]][0].delete_trigger = null;
-				storyBotTools.playbackScript(config, config.keys[indexMatch], slash_event);
+		// Check if there's already a configuration and if not, this will set it up. If there are config params in the DB load them as well
+		configTools.getConfig(auth.team_id, auth).then((config) => {
+			if (command === '/storybot' || command === '/devstorybot') {
+				storyBotTools.adminMenu(req.body);
 			} else {
-				console.error('<Slash Command> No matching command');
+				//	let config = configTools.getConfig(auth.team_id);
+				// Look if there's a trigger for a fake slash command and use it with a real slash command!
+				let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + args);
+				if (indexMatch >= 0) {
+					let slash_event = {
+						user: req.body.user_id,
+						channel: req.body.channel_id,
+						text: command + ' ' + args,
+						ts: 'slash',
+					};
+					// When matching a slash command, no need to delete the trigger as if it was a fake text command
+					config.scripts[config.keys[indexMatch]][0].delete_trigger = null;
+					storyBotTools.playbackScript(config, config.keys[indexMatch], slash_event);
+				} else {
+					console.error('<Slash Command> No matching command');
+				}
 			}
-		}
+		}).catch(console.error);
 	}).catch(console.error);
 });
 
