@@ -1008,14 +1008,14 @@ const deleteAllHistory = (config) => {
 
 // Delete a message (or, if it's the first message in a thread, delete the whole thread)
 // This is used with an event subscription to delete things that might not already be in the history
-exports.deleteItem = (config, channel, ts) => {
+exports.deleteItem = (webClient, channel, ts) => {
 // Get a list of any thread replies to delete as well
-	config.webClientUser.channels.replies({
+	webClient.channels.replies({
 		channel: channel,
 		thread_ts: ts
 	}).then((res) => {
 		res.messages.forEach(function(message) {
-			config.webClientUser.chat.delete({
+			webClient.chat.delete({
 				channel: channel,
 				ts: message.ts
 			}).catch(console.error);
@@ -1151,15 +1151,10 @@ exports.historyCleanup = (config, payload, respond) => {
 }
 
 // Do the initial work to make sure there's a valid connection, cache users and channels
-exports.setupNewConfig = (config, team_id) => {
+exports.setupNewConfig = (config) => {
 	config.webClientUser.auth.test()
 		.then((res) => {
-	//		console.log('<DEBUG><setupNewConfig>auth result is', res);
-			const {
-				team,
-				user_id
-			} = res;
-			console.log('<Loading> Bot connected to workspace', team);
+			console.log('<Loading> Bot connected to workspace', res.team);
 
 			// Cache info on the users for ID translation and inviting to channels
 			// TODO - make this the bot's ID so it's excluded?

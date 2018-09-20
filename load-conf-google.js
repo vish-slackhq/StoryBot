@@ -9,16 +9,13 @@ const extractGSheet = require('spreadsheet-to-json');
 const {
   WebClient
 } = require('@slack/client');
+// Fun with oAuth
+//redis = require('./redis');
 
 var allConfigs = [];
 
 exports.setConfig = (team_id, args) => {
-  // TODO this is not elegant, but let's just test if this can work
-  if (!allConfigs[team_id]) {
-    allConfigs[team_id] = {};
-    allConfigs[team_id].message_history = [];
-  }
-
+  
   // Allow full URLs
   let match = args.gsheetID.match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
   if (match) {
@@ -38,6 +35,28 @@ exports.getConfig = (team_id) => {
   } else {
     return null;
   }
+}
+
+exports.setupConfig = (data) => {
+  if (!allConfigs[data.team_id]) {
+    allConfigs[data.team_id] = {};
+    allConfigs[data.team_id].message_history = [];
+    allConfigs[data.team_id].keys = [];
+    allConfigs[data.team_id].configParams = {};
+  }
+
+  if (!allConfigs[data.team_id].webClientUser) {
+    allConfigs[data.team_id].webClientUser = new WebClient(data.access_token);
+  }
+
+console.log('setupConfig ... data.configParams is',data.configParams);
+// If there are stored config paramters, set them and load the config
+  if(data.configParams) {
+    allConfigs[data.team_id].configParams = data.configParams;
+    //exports.loadConfig(data.team_id);
+  } 
+
+  return allConfigs[data.team_id];
 }
 
 // Load config
@@ -68,15 +87,15 @@ exports.loadConfig = (team_id) => {
 // jank jank jank
 exports.createWebClient = (team_id, access_token) => {
   //  console.log('<WEB CLIENT> Request for team', team_id);
-  if (!allConfigs[team_id]) {
-    allConfigs[team_id] = {};
-    allConfigs[team_id].message_history = [];
-    allConfigs[team_id].keys = [];
-  }
-  if (!allConfigs[team_id].webClientUser) {
-    //  console.log('<WEB CLIENT> Creating a new client');
-    allConfigs[team_id].webClientUser = new WebClient(access_token);
-  } else {
-    //  console.log('<WEB CLIENT> Found an existing client');
-  }
+  /*   if (!allConfigs[team_id]) {
+       allConfigs[team_id] = {};
+       allConfigs[team_id].message_history = [];
+       allConfigs[team_id].keys = [];
+     }
+     if (!allConfigs[team_id].webClientUser) {
+       //  console.log('<WEB CLIENT> Creating a new client');*/
+  allConfigs[team_id].webClientUser = new WebClient(access_token);
+  //   } else {
+  //  console.log('<WEB CLIENT> Found an existing client');
+  // }
 }

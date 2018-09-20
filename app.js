@@ -30,30 +30,6 @@ var configTools = require('./load-conf-google');
 // Set up the Storybot tools - where the magic happens
 const storyBotTools = require('./storytools.js');
 
-//for testing purposes only - populating my dev org until we can get some DB persistence for the 3 google vars
-redis.get('T56FL0NGJ').then((auth) => {
-	//	console.log('redis results for team', auth.team_id, 'are', auth);
-	let configParams = null;
-	if (!auth.configParams) {
-		//	console.log('storing shit')
-		configParams = {
-			gsheetID: process.env.GSHEET_ID,
-			clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-			privateKey: process.env.GOOGLE_PRIVATE_KEY
-		};
-		//	redis.set(auth.team_id, configParams);
-	}
-	configTools.setConfig(auth.team_id, {
-		gsheetID: process.env.GSHEET_ID,
-		clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-		privateKey: process.env.GOOGLE_PRIVATE_KEY
-	}); //auth.configParams || configParams);
-	configTools.loadConfig(auth.team_id).catch(console.error);
-	configTools.createWebClient(auth.team_id, auth.access_token);
-	storyBotTools.setupNewConfig(configTools.getConfig(auth.team_id));
-});
-// end testing section
-
 // Express app server
 const http = require('http');
 const express = require('express');
@@ -100,11 +76,21 @@ slackEvents.on('message', (event, body) => {
 // Listen for reaction_added event
 slackEvents.on('reaction_added', (event, body) => {
 	redis.get(body.team_id).then((auth) => {
-		let config = configTools.getConfig(auth.team_id);
+		//	let config = configTools.getConfig(auth.team_id);
 		// Put a :skull: on an item and the bot will kill it dead (and any threaded replies)
 		if (event.reaction === 'skull') {
-			storyBotTools.deleteItem(config, event.item.channel, event.item.ts);
+			storyBotTools.deleteItem(new WebClient(auth.access_token), event.item.channel, event.item.ts);
 		} else {
+			// Check if there's already a configuration
+			let config = configTools.getConfig(auth.team_id);
+			// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
+			// lets just create a new webclient so we can get to the config menu stuff
+			if (!config) {
+				config = configTools.setupConfig(auth);
+				configTools.loadConfig(auth.team_id).then((res) => {
+					storyBotTools.setupNewConfig(config);
+				}).catch(console.error);
+			}
 			// Allow reacjis to trigger a story but WARNING this can be recursive right now!!!! 
 			// Use a unique reacji vs one being used elsewhere in the scripts
 			if (config.keys.indexOf(':' + event.reaction + ':') >= 0) {
@@ -127,12 +113,13 @@ slackEvents.on('error', console.error);
 // Look for matches for dynamic callbacks
 slackInteractions.action(/callback_/, (payload, respond) => {
 	redis.get(payload.team.id).then((auth) => {
+		// Check if there's already a configuration
 		let config = configTools.getConfig(auth.team_id);
 		// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
 		// lets just create a new webclient so we can get to the config menu stuff
 		if (!config) {
-			configTools.createWebClient(payload.team.id, auth.access_token);
-			config = configTools.getConfig(payload.team.id);
+			config = configTools.setupConfig(auth);
+			storyBotTools.setupNewConfig(config);
 		}
 
 		if (payload.callback_id === 'callback_history_cleanup') {
@@ -197,14 +184,21 @@ app.post('/slack/commands', function(req, res) {
 		// Actual: ${slashSig}`);
 	}
 
-	//	console.log('<DEBUG><oAuth><slash handler> request is', req.body);
 	// Check if the requesting team / user is already in the DB
 	redis.get(req.body.team_id).then((auth) => {
-		//console.log('<DEBUG><oAuth><slash handler> team_id lookup result is', auth);
+		// Check if there's already a configuration
+		let config = configTools.getConfig(auth.team_id);
+		// If This is the first admin menu call, nothing has been setup yet - really should trigger a setup DM to prompt to [config]
+		// lets just create a new webclient so we can get to the config menu stuff
+		if (!config) {
+			config = configTools.setupConfig(auth);
+			storyBotTools.setupNewConfig(config);
+		}
+
 		if (command === '/storybot' || command === '/devstorybot') {
 			storyBotTools.adminMenu(req.body);
 		} else {
-			let config = configTools.getConfig(auth.team_id);
+			//	let config = configTools.getConfig(auth.team_id);
 			// Look if there's a trigger for a fake slash command and use it with a real slash command!
 			let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + args);
 			if (indexMatch >= 0) {
