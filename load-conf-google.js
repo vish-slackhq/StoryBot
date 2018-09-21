@@ -43,12 +43,16 @@ exports.getConfig = (team_id, data) => {
       allConfigs[team_id].message_history = [];
       allConfigs[team_id].keys = [];
       allConfigs[team_id].configParams = {};
+      allConfigs[team_id].quiet = false;
     }
     // If there are config params already stored, load them
     if (data) {
       // create a new web client for the team
       if (!allConfigs[team_id].webClientUser) {
         allConfigs[team_id].webClientUser = new WebClient(data.access_token);
+      }
+      if (!allConfigs[team_id].webClientBot) {
+        allConfigs[team_id].webClientBot = new WebClient(data.bot.bot_access_token);
       }
 
       if (data.configParams) {

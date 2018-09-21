@@ -159,9 +159,14 @@ app.use(bodyParser.json());
 app.post('/slack/commands', function(req, res) {
 	// respond immediately!
 	res.status(200).end();
-
-	let command = req.body.command;
-	let args = req.body.text;
+	//	console.log('req is', req);
+	//	let command = req.body.command;
+	//	let args = req.body.text;
+	const {
+		command,
+		text,
+		team_id
+	} = req.body;
 	const timeStamp = req.headers['x-slack-request-timestamp'];
 	const slashSig = req.headers['x-slack-signature'];
 	const reqBody = JSON.stringify(req.body);
@@ -184,20 +189,23 @@ app.post('/slack/commands', function(req, res) {
 		// Check if there's already a configuration and if not, this will set it up. If there are config params in the DB load them as well
 		configTools.getConfig(auth.team_id, auth).then((config) => {
 			if (command === '/storybot' || command === '/devstorybot') {
-				if (args === 'set') {
+				if (text === 'dm') {
+					config.dm = !config.dm;
+				}
+				if (text === 'set') {
 					config.message_history = [];
 				} else {
-				storyBotTools.adminMenu(req.body);
-			}
+					storyBotTools.adminMenu(req.body, config);
+				}
 			} else {
 				//	let config = configTools.getConfig(auth.team_id);
 				// Look if there's a trigger for a fake slash command and use it with a real slash command!
-				let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + args);
+				let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + text);
 				if (indexMatch >= 0) {
 					let slash_event = {
 						user: req.body.user_id,
 						channel: req.body.channel_id,
-						text: command + ' ' + args,
+						text: command + ' ' + text,
 						ts: 'slash',
 					};
 					// When matching a slash command, no need to delete the trigger as if it was a fake text command

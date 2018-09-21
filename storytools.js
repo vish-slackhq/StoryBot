@@ -710,11 +710,12 @@ const deleteHistoryItem = (config, term) => {
 }
 
 // Build and send the StoryBot admin menu when called
-exports.adminMenu = (body) => {
+exports.adminMenu = (body, config) => {
 
 	const {
 		text,
 		response_url,
+		user_id
 	} = body;
 
 	//Build the admin menu for the bot
@@ -768,21 +769,33 @@ exports.adminMenu = (body) => {
 		}]
 	}];
 
-	const webhook = new IncomingWebhook(response_url);
-	// TODO - consider cleaning these up to avoid excess clutter in the channel
-	webhook.send({
-		attachments: admin_menu,
-		response_type: 'ephemeral',
-		replace_original: true
-	}).catch((err) => {
-		console.error('<Error><Admin Menu><webhook.send>', err);
-	});
+	if (config.dm) {
+		config.webClientBot.conversations.open({
+			users: body.user_id
+		}).then((res => {
+			config.webClientBot.chat.postMessage({
+				as_user: false,
+				channel: res.channel.id,
+				attachments: admin_menu
+			}).catch(console.error);
+
+		})).catch(console.error);
+	} else {
+		const webhook = new IncomingWebhook(response_url);
+		// TODO - consider cleaning these up to avoid excess clutter in the channel
+		webhook.send({
+			attachments: admin_menu,
+			response_type: 'ephemeral',
+			replace_original: true
+		}).catch((err) => {
+			console.error('<Error><Admin Menu><webhook.send>', err);
+		});
+	}
 }
 
 // Handle the admin menu callbacks
 exports.adminCallback = (payload, respond, configTools) => {
 	configTools.getConfig(payload.team.id).then((config) => {
-	//	console.log('adminCallback config is!', config);
 		switch (payload.actions[0].value) {
 			case 'Triggers':
 				{
