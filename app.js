@@ -65,7 +65,13 @@ slackEvents.on('message', (event, body) => {
 		if (event.type === 'message' && !event.subtype && !event.bot_id) {
 			configTools.getConfig(auth.team_id, auth).then((config) => {
 				// Matched a trigger from a user so playback the story
-				let indexMatch = indexOfIgnoreCase(config.keys, event.text);
+				let regexRes = event.text.match(/\/.*(?=\s)/);
+				let indexMatch = null;
+				if (regexRes) {
+					indexMatch = indexOfIgnoreCase(config.keys, regexRes[0]);
+				} else {
+					indexMatch = indexOfIgnoreCase(config.keys, event.text);
+				}
 				if (indexMatch >= 0) {
 					storyBotTools.playbackScript(config, config.keys[indexMatch], event);
 				}
