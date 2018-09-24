@@ -56,10 +56,10 @@ exports.getConfig = (team_id, data) => {
       }
 
       if (data.configParams) {
-        if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.clientEmail === allConfigs[team_id].configParams.clientEmail && data.configParams.privateKey === allConfigs[team_id].configParams.privateKey)) {
+    //    if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.clientEmail === allConfigs[team_id].configParams.clientEmail && data.configParams.privateKey === allConfigs[team_id].configParams.privateKey)) {
           allConfigs[team_id].configParams = data.configParams;
           exports.loadConfig(team_id);
-        }
+      //  }
       }
     }
     resolve(allConfigs[team_id]);

@@ -68,11 +68,6 @@ exports.playbackScript = (config, term, event) => {
 						action.attachments = action.attachments.replace(/}$/, '');
 					}
 
-					// check if the action has a reaction, then check if the format needs to be cleaned up for the places where : isn't accepted
-					if (action.reaction) {
-						action.reaction = action.reaction.replace(/:/g, '');
-					}
-
 					// check if the action has an icon_emoji, then check if the format needs to be cleaned up for the places where : is required
 					if (action.icon_emoji) {
 						if (action.icon_emoji.match(/^(?!:).*(?!:)$/)) {
@@ -217,7 +212,7 @@ exports.playbackScript = (config, term, event) => {
 										as_user: true,
 										username: action.username,
 										channel: target_channel,
-										name: action.reaction,
+										name: action.reaction.replace(/:/g, ''),
 										timestamp: target_ts
 									})
 									.then((res) => {
@@ -455,7 +450,7 @@ exports.playbackScript = (config, term, event) => {
 									as_user: false,
 									username: action.username,
 									channel: target_channel,
-									name: action.reaction,
+									name: action.reaction.replace(/:/g, ''),
 									timestamp: target_ts
 								})
 								.then((res) => {
@@ -748,13 +743,13 @@ exports.adminMenu = (body, config) => {
 			type: 'button',
 			style: 'default',
 			value: 'Cleanup All'
-		}, {
+		}, /*{
 			name: 'Reload Config',
 			text: 'Reload Config',
 			type: 'button',
 			style: 'default',
 			value: 'Reload Config'
-		}, {
+		},*/ {
 			name: 'Config',
 			text: 'Config',
 			type: 'button',
