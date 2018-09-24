@@ -197,6 +197,13 @@ app.post('/slack/commands', function(req, res) {
 				}
 				if (text === 'set') {
 					config.message_history = [];
+				}
+				if (text === 'cleanup') {
+					storyBotTools.deleteAllHistory(config);
+				}
+				if (text === 'reload') {
+					configTools.loadConfig(req.body.team_id).catch(console.error);
+
 				} else {
 					storyBotTools.adminMenu(req.body, config);
 				}

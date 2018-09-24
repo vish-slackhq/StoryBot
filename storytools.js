@@ -881,7 +881,7 @@ exports.adminCallback = (payload, respond, configTools) => {
 				}
 			case 'Cleanup All':
 				{
-					let msg = deleteAllHistory(config);
+					let msg = exports.deleteAllHistory(config);
 					respond({
 						text: msg,
 						replace_original: true,
@@ -1002,7 +1002,7 @@ const addHistory = (config, term, data) => {
 }
 
 // Burn it all down
-const deleteAllHistory = (config) => {
+exports.deleteAllHistory = (config) => {
 	let historyKeys = Object.keys(config.message_history);
 	if (!(historyKeys.length > 0)) {
 		console.log('<History> No history to delete!');
