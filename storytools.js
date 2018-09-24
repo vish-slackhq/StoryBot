@@ -743,15 +743,15 @@ exports.adminMenu = (body, config) => {
 			type: 'button',
 			style: 'default',
 			value: 'Cleanup All'
-		}, /*{
+		}, {
 			name: 'Reload Config',
 			text: 'Reload Config',
 			type: 'button',
 			style: 'default',
 			value: 'Reload Config'
-		},*/ {
-			name: 'Config',
-			text: 'Config',
+		}, {
+			name: 'Set Config',
+			text: 'Set Config',
 			type: 'button',
 			style: 'default',
 			value: 'Config'

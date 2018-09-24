@@ -43,7 +43,7 @@ exports.getConfig = (team_id, data) => {
       allConfigs[team_id].message_history = [];
       allConfigs[team_id].keys = [];
       allConfigs[team_id].configParams = {};
-      allConfigs[team_id].quiet = false;
+      allConfigs[team_id].dm = false;
     }
     // If there are config params already stored, load them
     if (data) {
@@ -56,10 +56,13 @@ exports.getConfig = (team_id, data) => {
       }
 
       if (data.configParams) {
-    //    if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.clientEmail === allConfigs[team_id].configParams.clientEmail && data.configParams.privateKey === allConfigs[team_id].configParams.privateKey)) {
+        if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.clientEmail === allConfigs[team_id].configParams.clientEmail && data.configParams.privateKey === allConfigs[team_id].configParams.privateKey)) {
           allConfigs[team_id].configParams = data.configParams;
           exports.loadConfig(team_id);
-      //  }
+        }
+      }
+      if (data.dm) {
+        allConfigs[team_id].dm = data.dm;
       }
     }
     resolve(allConfigs[team_id]);

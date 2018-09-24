@@ -191,6 +191,9 @@ app.post('/slack/commands', function(req, res) {
 			if (command === '/storybot' || command === '/devstorybot') {
 				if (text === 'dm') {
 					config.dm = !config.dm;
+					redis.set(auth.team_id, Object.assign(auth, {
+						dm: config.dm
+					})).catch(console.error);
 				}
 				if (text === 'set') {
 					config.message_history = [];
