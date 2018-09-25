@@ -232,7 +232,7 @@ app.post('/slack/commands', function(req, res) {
 							}).catch(console.error);
 						}).catch(console.error);
 					} else if (text === 'debug') {
-						console.log('allConfigs =', configTools.debugConfigs());
+						console.log('allConfigs =', configTools.debugConfig());
 					} else {
 						storyBotTools.adminMenu(req.body, config);
 					}
