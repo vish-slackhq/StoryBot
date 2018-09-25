@@ -9,30 +9,8 @@ const extractGSheet = require('spreadsheet-to-json');
 const {
   WebClient
 } = require('@slack/client');
-// Fun with oAuth
-//redis = require('./redis');
 
 var allConfigs = [];
-
-/*
-// Store the config parameters in the DB
-exports.setConfig = (auth, args) => {
-  console.log('setConfig running for ', auth.team_id);
-  // Allow full URLs
-  let match = args.gsheetID.match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
-  if (match) {
-    args.gsheetID = match[0];
-  }
-
-  redis.set(auth.team_id, Object.assign(auth, {
-    configParams: {
-      gsheetID: args.gsheetID,
-      clientEmail: args.clientEmail,
-      privateKey: args.privateKey
-    }
-  }));
-}
-*/
 
 // Return the requested config
 exports.getConfig = (team_id, data) => {
@@ -58,7 +36,7 @@ exports.getConfig = (team_id, data) => {
       if (data.configParams) {
         if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.clientEmail === allConfigs[team_id].configParams.clientEmail && data.configParams.privateKey === allConfigs[team_id].configParams.privateKey)) {
           allConfigs[team_id].configParams = data.configParams;
-          exports.loadConfig(team_id);
+          resolve(exports.loadConfig(team_id));
         }
       }
       if (data.dm) {
