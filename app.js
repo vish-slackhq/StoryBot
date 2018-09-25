@@ -65,10 +65,14 @@ slackEvents.on('message', (event, body) => {
 		if (event.type === 'message' && !event.subtype && !event.bot_id) {
 			configTools.getConfig(auth.team_id, auth).then((config) => {
 				// Matched a trigger from a user so playback the story
-				let regexRes = event.text.match(/\/.*(?=\s)/);
+				let regexRes = event.text.match(/(\/.*(?=\s)) .*/);
 				let indexMatch = null;
+				// Do this to hanle slash commands allowing anything after the trigger text
 				if (regexRes) {
 					indexMatch = indexOfIgnoreCase(config.keys, regexRes[0]);
+					if (indexMatch < 0) {
+						indexMatch = indexOfIgnoreCase(config.keys, regexRes[1]);
+					}
 				} else {
 					indexMatch = indexOfIgnoreCase(config.keys, event.text);
 				}
