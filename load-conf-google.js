@@ -47,6 +47,15 @@ exports.getConfig = (team_id, data) => {
   })
 }
 
+// Delete a config
+exports.deleteConfig = (team_id) => {
+  return new Promise((resolve) => {
+  //  delete allConfigs[team_id].webClientUser;
+  //  delete allConfigs[team_id].webClientBot;
+    resolve(delete allConfigs[team_id]);
+  })
+}
+
 // Load config
 exports.loadConfig = (team_id) => {
   return new Promise((resolve, reject) => {

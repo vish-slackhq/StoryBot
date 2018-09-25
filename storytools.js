@@ -730,6 +730,25 @@ exports.adminMenu = (body, config) => {
 	}
 }
 
+// Handle a Re-Auth request
+exports.adminReauth = (response_url, auth_url) => {
+	const webhook = new IncomingWebhook(response_url);
+	webhook.send({
+		text: "Invalid Auth, please re-install StoryBot for this workspace",
+		attachments: [{
+			fallback: "Reinstall App",
+			actions: [{
+				type: "button",
+				text: "Reinstall App",
+				url: auth_url
+			}]
+		}]
+	}).catch((err) => {
+		console.error('<Error><ReAuth><webhook.send>', err);
+	});
+
+}
+
 // Handle the admin menu callbacks
 exports.adminCallback = (payload, respond, configTools) => {
 	configTools.getConfig(payload.team.id).then((config) => {
@@ -889,6 +908,25 @@ exports.adminCallback = (payload, respond, configTools) => {
 						dialog: configDialog
 					}).catch((err) => {
 						console.log('<Error><Admin Menu><Config dialog.open>', err);
+						if (err.data.error === 'token_revoked') {
+							//	exports.adminReauth()
+							respond({
+								text: "Invalid Auth, please re-install StoryBot for this workspace",
+								attachments: [{
+									fallback: "Reinstall App",
+									actions: [{
+										type: "button",
+										text: "Reinstall App",
+										url: "https://slack.com/oauth/authorize?" + qs.stringify({
+											client_id: process.env.SLACK_CLIENT_ID,
+											scope: process.env.SCOPE
+										})
+									}]
+								}]
+							}).catch((err) => {
+								console.error('<Error><Admin Menu><dialog.open response>', err);
+							});
+						}
 					});
 
 					break;
