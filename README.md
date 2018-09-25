@@ -18,7 +18,7 @@ Supports:
 * Set up Node/npm: https://nodejs.org/en/download/
 * Set up ngrok: https://ngrok.com/download
 * Set up Gdrive API access & generate a google-creds.json file: https://www.npmjs.com/package/google-spreadsheet#service-account-recommended-method
-***Add `client_email` and `private_key` to your dot.env file
+*** Add `client_email` and `private_key` to your dot.env file
 
 ## Create New Slack App
 
@@ -42,9 +42,9 @@ Supports:
 ### Install App to Team
 * get Bot(?) & OAuth token and add to .env file
 * Run the app for the first time so it can respond to Events challenges (below):
-**Make sure the dot.env.sample file is filled out
-***`npm install` first time to get all required modules
-***`node index.js -c CONFIG.env`
+** Make sure the dot.env.sample file is filled out
+*** `npm install` first time to get all required modules
+*** `node index.js -c CONFIG.env`
 ***** (defaults to .env if no config file is specified)
 
 ### Set up additional interactivity and events
@@ -54,7 +54,10 @@ Supports:
     * Setup Request URL with ngrok https URL + /slack/events
     * Subscribe to ***Workspace events*** for:
         * message.channels
+        * message.im
+        * message.groups
         * reaction_added
+        * tokens_revoked
         * other message.groups/IM if needed
 
 
