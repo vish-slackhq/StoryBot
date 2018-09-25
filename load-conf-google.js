@@ -12,7 +12,7 @@ const {
 
 var allConfigs = [];
 
-// Return the requested config
+// Return the requested config - if it doesn't exist, create it
 exports.getConfig = (team_id, data) => {
   return new Promise((resolve) => {
     // If there isn't a config for the team, create a blank one
