@@ -56,6 +56,10 @@ exports.deleteConfig = (team_id) => {
   })
 }
 
+exports.debugConfig = () => {
+  return allConfigs;
+}
+
 // Load config
 exports.loadConfig = (team_id) => {
   return new Promise((resolve, reject) => {
