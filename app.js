@@ -153,8 +153,7 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 					redis.set(auth.team_id, Object.assign(auth, {
 						configParams: {
 							gsheetID: payload.submission['Google Sheet Link'],
-							clientEmail: payload.submission['Google API Email'],
-							privateKey: payload.submission['Google Private Key']
+							googleCreds: JSON.parse(payload.submission['Google API Credentials'])
 						}
 					})).catch(console.error);
 					configTools.getConfig(auth.team_id, auth);

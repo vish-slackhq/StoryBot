@@ -876,12 +876,10 @@ exports.adminCallback = (payload, respond, configTools) => {
 				{
 					// TODO janky, fix eventually
 					let gsheetID = '',
-						clientEmail = '',
-						privateKey = '';
+						googleCreds = '';
 					if (config.configParams) {
 						gsheetID = config.configParams.gsheetID;
-						clientEmail = config.configParams.clientEmail;
-						privateKey = config.configParams.privateKey;
+						googleCreds = JSON.stringify(config.configParams.googleCreds);
 					}
 
 					const configDialog = {
@@ -889,36 +887,27 @@ exports.adminCallback = (payload, respond, configTools) => {
 						title: 'Configuration Menu',
 						submit_label: 'Submit',
 						elements: [{
-							optional: false,
-							max_length: 150,
-							hint: 'URL to the Google Sheet with the Config Info',
-							name: 'Google Sheet Link',
-							value: gsheetID,
-							placeholder: '',
-							min_length: 0,
-							label: 'Google Sheet Link',
-							type: 'text'
-						}, {
-							optional: false,
-							max_length: 150,
-							hint: 'Email address that the sheet is shared with',
-							name: 'Google API Email',
-							value: clientEmail,
-							placeholder: '',
-							min_length: 0,
-							label: 'Google API Email',
-							type: 'text'
-						}, {
-							optional: false,
-							max_length: 2000,
-							hint: 'Private key',
-							name: 'Google Private Key',
-							value: privateKey,
-							placeholder: '',
-							min_length: 0,
-							label: 'Google Private Key',
-							type: 'textarea'
-						}]
+								optional: false,
+								max_length: 150,
+								hint: 'URL to the Google Sheet with the Config Info',
+								name: 'Google Sheet Link',
+								value: gsheetID,
+								placeholder: '',
+								min_length: 0,
+								label: 'Google Sheet Link',
+								type: 'text'
+							},{
+								optional: false,
+								max_length: 3000,
+								hint: 'Google API Credentials',
+								name: 'Google API Credentials',
+								value: googleCreds,
+								placeholder: '',
+								min_length: 0,
+								label: 'Google API Credentials',
+								type: 'textarea'
+							}
+						]
 					};
 
 					// Config would be the first command run to set things up - need to check if the tokens in the running config are correct

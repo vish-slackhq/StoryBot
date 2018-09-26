@@ -34,7 +34,7 @@ exports.getConfig = (team_id, data) => {
       }
 
       if (data.configParams) {
-        if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.clientEmail === allConfigs[team_id].configParams.clientEmail && data.configParams.privateKey === allConfigs[team_id].configParams.privateKey)) {
+           if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.googleCreds.client_email === allConfigs[team_id].configParams.googleCreds.client_email && data.configParams.googleCreds.private_key === allConfigs[team_id].configParams.googleCreds.private_key)) {
           allConfigs[team_id].configParams = data.configParams;
           resolve(exports.loadConfig(team_id));
         }
@@ -68,8 +68,8 @@ exports.loadConfig = (team_id) => {
       spreadsheetKey: allConfigs[team_id].configParams.gsheetID, // || process.env.GSHEET_ID,
       // your google oauth2 credentials 
       credentials: {
-        client_email: allConfigs[team_id].configParams.clientEmail, // || process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: allConfigs[team_id].configParams.privateKey, // || process.env.GOOGLE_PRIVATE_KEY
+        client_email: allConfigs[team_id].configParams.googleCreds.client_email, // || process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: allConfigs[team_id].configParams.googleCreds.private_key, // || process.env.GOOGLE_PRIVATE_KEY
       },
       // names of the sheet you want to extract (or [] for all) 
       sheetsToExtract: []
