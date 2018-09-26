@@ -329,7 +329,7 @@ slackEvents.on('tokens_revoked', (event, body) => {
 
 // The main site
 app.get('/', (req, res) => {
-	res.send('<a href="https://slack.com/oauth/authorize?client_id=176530022562.442738596756&scope=bot,channels:write,channels:read,chat:write:bot,chat:write:user,files:write:user,groups:read,groups:write,reactions:read,reactions:write,users:read,commands,channels:history,groups:history,im:history"><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>');
+	res.send('<hr> Install Storybot to your workspace here: </hr><a href="https://slack.com/oauth/authorize?client_id=176530022562.442738596756&scope=bot,channels:write,channels:read,chat:write:bot,chat:write:user,files:write:user,groups:read,groups:write,reactions:read,reactions:write,users:read,commands,channels:history,groups:history,im:history"><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>');
 });
 
 // Select a port for the server to listen on.
