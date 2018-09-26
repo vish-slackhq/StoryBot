@@ -14,6 +14,7 @@ console.log('<Loading> Config file is', config_file);
 require('dotenv').config({
 	path: `${config_file}`
 });
+// For some API calls when there isn't a token
 const axios = require('axios');
 // Fun with oAuth
 redis = require('./redis');
@@ -57,19 +58,23 @@ app.use('/slack/actions', slackInteractions.expressMiddleware());
 // Mount the event handler on a route
 app.use('/slack/events', slackEvents.expressMiddleware());
 
-// Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
+// Listen for message events
 slackEvents.on('message', (event, body) => {
+	// Check for an auth in the DB
 	redis.get(body.team_id).then((auth) => {
+		// Make sure there's a valid auth
 		if (Object.keys(auth).length > 0) {
 			// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
 			// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
 			if (event.type === 'message' && !event.subtype && !event.bot_id) {
+				// Retreive the config (or populate from the DB)
 				configTools.getConfig(auth.team_id, auth).then((config) => {
 					// Matched a trigger from a user so playback the story
+					// Do this to hanle slash commands allowing anything after the trigger text
 					let regexRes = event.text.match(/(\/.*(?=\s)) .*/);
 					let indexMatch = null;
-					// Do this to hanle slash commands allowing anything after the trigger text
 					if (regexRes) {
+						// Check for a full slash command trigger match, or if not just the command and exclude any args
 						indexMatch = indexOfIgnoreCase(config.keys, regexRes[0]);
 						if (indexMatch < 0) {
 							indexMatch = indexOfIgnoreCase(config.keys, regexRes[1]);
@@ -140,11 +145,6 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 				} else if (payload.callback_id === 'callback_admin_menu') {
 					storyBotTools.adminCallback(payload, respond, configTools);
 				} else if (payload.callback_id === 'callback_config') {
-					/*configTools.setConfig(auth, {
-						gsheetID: payload.submission['Google Sheet Link'],
-						clientEmail: payload.submission['Google API Email'],
-						privateKey: payload.submission['Google Private Key']
-					});*/
 					// Allow full URLs
 					let match = payload.submission['Google Sheet Link'].match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
 					if (match) {
@@ -158,6 +158,9 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 						}
 					})).catch(console.error);
 					configTools.getConfig(auth.team_id, auth);
+				} else if (payload.callback_id === 'callback_add_trigger') {
+					console.log('<addtrigger> ok lets append this trigger');
+					configTools.addTriggerToConfig(auth.team_id, payload.submission);
 				} else {
 					if (config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id)) {
 						storyBotTools.callbackMatch(payload, respond, config, config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
@@ -203,7 +206,9 @@ app.post('/slack/commands', function(req, res) {
 		team_id,
 		user_id,
 		channel_id,
-		headers
+		headers,
+		trigger_id,
+		response_url
 	} = req.body;
 
 	// Secrets, secrets are no fun
@@ -249,6 +254,8 @@ app.post('/slack/commands', function(req, res) {
 					} else if (text === 'debug') {
 						// Put out the entire running config to console
 						console.log('allConfigs =', configTools.debugConfig());
+					} else if (text === 'trigger') {
+						storyBotTools.newTriggerDialog(config, trigger_id);
 					} else {
 						// Or, if no options, generate the admin menu
 						storyBotTools.adminMenu(req.body, config);
@@ -274,7 +281,7 @@ app.post('/slack/commands', function(req, res) {
 		} else {
 			// Getting a request from an installed app, but there's no info in the DB - prompt to reauth it
 			console.log('<AUTH> Request from workspace', team_id, 'does not have valid auth!');
-			storyBotTools.adminReauth(req.body.response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
+			storyBotTools.adminReauth(response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
 				client_id: process.env.SLACK_CLIENT_ID,
 				scope: process.env.SCOPE
 			}));

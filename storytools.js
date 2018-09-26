@@ -184,7 +184,7 @@ exports.playbackScript = (config, term, event) => {
 											});
 										})
 										.catch((err) => {
-											console.error('<Error><Main Loop><chat.postMessage>', err);
+											console.error('<Error><Main Loop><Bot chat.postMessage>', err);
 											nextItem();
 										});
 								} else {
@@ -1109,4 +1109,74 @@ exports.historyCleanup = (config, payload, respond) => {
 		ephemeral: true
 	};
 	respond(response).catch(console.error);
+}
+
+
+// POC of dynamic trigger adds
+exports.newTriggerDialog = (config, trigger_id) => {
+	console.log('trigger_id is', trigger_id);
+	config.webClientUser.dialog.open({
+		trigger_id: trigger_id,
+		dialog: {
+			callback_id: 'callback_add_trigger',
+			title: 'Add Trigger',
+			submit_label: 'Submit',
+			elements: [{
+				optional: false,
+				max_length: 150,
+				hint: '',
+				name: 'Trigger Name',
+				value: '',
+				placeholder: '',
+				min_length: 0,
+				label: 'Trigger Name',
+				type: 'text'
+			}, {
+				type: 'select',
+				label: 'Type',
+				name: 'Type',
+				hint: '',
+				optional: false,
+				options: [{
+					value: 'message',
+					label: 'message'
+				}, {
+					value: 'bot',
+					label: 'bot message'
+				}]
+			}, {
+				optional: true,
+				max_length: 500,
+				hint: '',
+				name: 'Text',
+				value: '',
+				placeholder: '',
+				min_length: 0,
+				label: 'Text',
+				type: 'textarea'
+			}, {
+				optional: true,
+				max_length: 3000,
+				hint: '',
+				name: 'Attachments',
+				value: '',
+				placeholder: '',
+				min_length: 0,
+				label: 'Attachments',
+				type: 'textarea'
+			}, {
+				optional: true,
+				max_length: 150,
+				hint: '',
+				name: 'Username',
+				value: '',
+				placeholder: '',
+				min_length: 0,
+				label: 'Username',
+				type: 'text'
+			}]
+		}
+	}).catch((err) => {
+		console.log('<Error><Admin Menu><Config dialog.open>', err);
+	});
 }
