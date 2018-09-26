@@ -1,4 +1,3 @@
-//
 const redis = require('redis').createClient(process.env.REDIS_URL)
 exports.set = function(key, data) {
   let json = JSON.stringify(data)

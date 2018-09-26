@@ -855,8 +855,6 @@ exports.adminCallback = (payload, respond, configTools) => {
 			case 'Config':
 				{
 					// TODO janky, fix eventually
-					console.log('Config request for team', payload.team.id);
-
 					let gsheetID = '',
 						clientEmail = '',
 						privateKey = '';
@@ -903,13 +901,13 @@ exports.adminCallback = (payload, respond, configTools) => {
 						}]
 					};
 
+					// Config would be the first command run to set things up - need to check if the tokens in the running config are correct
 					config.webClientUser.dialog.open({
 						trigger_id: payload.trigger_id,
 						dialog: configDialog
 					}).catch((err) => {
 						console.log('<Error><Admin Menu><Config dialog.open>', err);
 						if (err.data.error === 'token_revoked') {
-							//	exports.adminReauth()
 							respond({
 								text: "Invalid Auth, please re-install StoryBot for this workspace",
 								attachments: [{
