@@ -6,3 +6,4 @@ glitch-dot-env-smock-test
 .DS_Store
 dump.rdb
 redis.conf
+*.bak

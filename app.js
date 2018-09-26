@@ -65,8 +65,8 @@ slackEvents.on('message', (event, body) => {
 		// Make sure there's a valid auth
 		if (Object.keys(auth).length > 0) {
 			// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
-			// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
-			if (event.type === 'message' && !event.subtype && !event.bot_id) {
+			// NOTE: remove this safety valve and add || (event.subtype === 'bot_message')) if you want to have nested replies and use at your own risk!
+			if ((event.type === 'message' && !event.subtype)) { //|| (event.subtype === 'bot_message')) {
 				// Retreive the config (or populate from the DB)
 				configTools.getConfig(auth.team_id, auth).then((config) => {
 					// Matched a trigger from a user so playback the story

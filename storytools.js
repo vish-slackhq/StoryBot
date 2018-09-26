@@ -799,14 +799,33 @@ exports.adminCallback = (payload, respond, configTools) => {
 					if (message_history_keys.length > 0) {
 						let attachments = [];
 						let actions = [];
-						message_history_keys.forEach(function(key) {
-							actions.push({
-								name: key,
-								text: key,
-								value: key,
-								type: 'button'
-							});
+						let history_overflow = {
+							name: 'history_overflow',
+							text: 'More History',
+							type: 'select',
+							options: []
+						};
+						message_history_keys.forEach(function(key, index) {
+							if (index < 4) {
+								actions.push({
+									name: key,
+									text: key,
+									value: key,
+									type: 'button'
+								});
+							} else {
+								// If more than 4 items, make a select dropdown for the rest
+								history_overflow.options.push({
+									text: key,
+									value: key
+								});
+							}
 						});
+
+						// If more than 4 items, make a select dropdown for the rest
+						if (message_history_keys.length >= 4) {
+							actions.push(history_overflow);
+						}
 
 						attachments.push({
 							actions: actions,
@@ -1102,7 +1121,13 @@ const createChannels = (channelInfo) => {
 
 // Clean up the history when a specific history term is being cleaned
 exports.historyCleanup = (config, payload, respond) => {
-	let msg = deleteHistoryItem(config, payload.actions[0].value);
+	let term = null;
+	if (payload.actions[0].type === 'select') {
+		term = payload.actions[0].selected_options[0].value;
+	} else {
+		term = payload.actions[0].value;
+	}
+	let msg = deleteHistoryItem(config, term);
 
 	response = {
 		text: msg,
