@@ -256,6 +256,7 @@ exports.playbackScript = (config, term, event) => {
 									token: tokens.find(o => o.name === action.username).token,
 									channels: action.channel,
 									filetype: action.filetype,
+									filename: action.filename,
 									title: action.title,
 									initial_comment: action.text,
 									content: action.content,
