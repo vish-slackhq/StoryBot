@@ -32,30 +32,31 @@ exports.getConfig = (team_id, data) => {
       if (!allConfigs[team_id].webClientBot) {
         allConfigs[team_id].webClientBot = new WebClient(data.bot.bot_access_token);
       }
-
+      if (data.dm) {
+        allConfigs[team_id].dm = data.dm;
+      }
       if (data.configParams) {
         // Added a switch to see if there was an old-style config in the DB and hack it into place
         // TODO - remove this once the DB is set up correctly again in all instances
         if (data.configParams.clientEmail || data.configParams.privateKey) {
-          console.log('<DB DEBUG> Old Style configParams detected. Currently is:',data.configParams);
+          console.log('<DB DEBUG> Old Style configParams detected. Currently is:', data.configParams);
           data.configParams.googleCreds = {};
           data.configParams.googleCreds.client_email = data.configParams.clientEmail;
           delete data.configParams.clientEmail;
           data.configParams.googleCreds.private_key = data.configParams.privateKey;
           delete data.configParams.privateKey;
-          console.log('<DB DEBUG> Old Style configParams detected. After change it is:',data.configParams);
+          console.log('<DB DEBUG> Old Style configParams detected. After change it is:', data.configParams);
           redis = require('./redis');
           redis.set(team_id, data).catch(console.error);
           allConfigs[team_id].configParams = data.configParams;
-        }
+          resolve(exports.loadConfig(team_id));
+        } //end section to remove once all converted
         if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.googleCreds.client_email === allConfigs[team_id].configParams.googleCreds.client_email && data.configParams.googleCreds.private_key === allConfigs[team_id].configParams.googleCreds.private_key)) {
           allConfigs[team_id].configParams = data.configParams;
           resolve(exports.loadConfig(team_id));
         }
       }
-      if (data.dm) {
-        allConfigs[team_id].dm = data.dm;
-      }
+
     }
     resolve(allConfigs[team_id]);
   })
