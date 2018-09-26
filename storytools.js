@@ -184,7 +184,7 @@ exports.playbackScript = (config, term, event) => {
 											});
 										})
 										.catch((err) => {
-											console.error('<Error><Main Loop><chat.postMessage>', err);
+											console.error('<Error><Main Loop><Bot chat.postMessage>', err);
 											nextItem();
 										});
 								} else {
@@ -256,6 +256,7 @@ exports.playbackScript = (config, term, event) => {
 									token: tokens.find(o => o.name === action.username).token,
 									channels: action.channel,
 									filetype: action.filetype,
+									filename: action.filename,
 									title: action.title,
 									initial_comment: action.text,
 									content: action.content,
@@ -798,14 +799,33 @@ exports.adminCallback = (payload, respond, configTools) => {
 					if (message_history_keys.length > 0) {
 						let attachments = [];
 						let actions = [];
-						message_history_keys.forEach(function(key) {
-							actions.push({
-								name: key,
-								text: key,
-								value: key,
-								type: 'button'
-							});
+						let history_overflow = {
+							name: 'history_overflow',
+							text: 'More History',
+							type: 'select',
+							options: []
+						};
+						message_history_keys.forEach(function(key, index) {
+							if (index < 4) {
+								actions.push({
+									name: key,
+									text: key,
+									value: key,
+									type: 'button'
+								});
+							} else {
+								// If more than 4 items, make a select dropdown for the rest
+								history_overflow.options.push({
+									text: key,
+									value: key
+								});
+							}
 						});
+
+						// If more than 4 items, make a select dropdown for the rest
+						if (message_history_keys.length >= 4) {
+							actions.push(history_overflow);
+						}
 
 						attachments.push({
 							actions: actions,
@@ -855,8 +875,6 @@ exports.adminCallback = (payload, respond, configTools) => {
 			case 'Config':
 				{
 					// TODO janky, fix eventually
-					console.log('Config request for team', payload.team.id);
-
 					let gsheetID = '',
 						clientEmail = '',
 						privateKey = '';
@@ -903,13 +921,13 @@ exports.adminCallback = (payload, respond, configTools) => {
 						}]
 					};
 
+					// Config would be the first command run to set things up - need to check if the tokens in the running config are correct
 					config.webClientUser.dialog.open({
 						trigger_id: payload.trigger_id,
 						dialog: configDialog
 					}).catch((err) => {
 						console.log('<Error><Admin Menu><Config dialog.open>', err);
 						if (err.data.error === 'token_revoked') {
-							//	exports.adminReauth()
 							respond({
 								text: "Invalid Auth, please re-install StoryBot for this workspace",
 								attachments: [{
@@ -1103,7 +1121,13 @@ const createChannels = (channelInfo) => {
 
 // Clean up the history when a specific history term is being cleaned
 exports.historyCleanup = (config, payload, respond) => {
-	let msg = deleteHistoryItem(config, payload.actions[0].value);
+	let term = null;
+	if (payload.actions[0].type === 'select') {
+		term = payload.actions[0].selected_options[0].value;
+	} else {
+		term = payload.actions[0].value;
+	}
+	let msg = deleteHistoryItem(config, term);
 
 	response = {
 		text: msg,
@@ -1111,4 +1135,74 @@ exports.historyCleanup = (config, payload, respond) => {
 		ephemeral: true
 	};
 	respond(response).catch(console.error);
+}
+
+
+// POC of dynamic trigger adds
+exports.newTriggerDialog = (config, trigger_id) => {
+	console.log('trigger_id is', trigger_id);
+	config.webClientUser.dialog.open({
+		trigger_id: trigger_id,
+		dialog: {
+			callback_id: 'callback_add_trigger',
+			title: 'Add Trigger',
+			submit_label: 'Submit',
+			elements: [{
+				optional: false,
+				max_length: 150,
+				hint: '',
+				name: 'Trigger Name',
+				value: '',
+				placeholder: '',
+				min_length: 0,
+				label: 'Trigger Name',
+				type: 'text'
+			}, {
+				type: 'select',
+				label: 'Type',
+				name: 'Type',
+				hint: '',
+				optional: false,
+				options: [{
+					value: 'message',
+					label: 'message'
+				}, {
+					value: 'bot',
+					label: 'bot message'
+				}]
+			}, {
+				optional: true,
+				max_length: 500,
+				hint: '',
+				name: 'Text',
+				value: '',
+				placeholder: '',
+				min_length: 0,
+				label: 'Text',
+				type: 'textarea'
+			}, {
+				optional: true,
+				max_length: 3000,
+				hint: '',
+				name: 'Attachments',
+				value: '',
+				placeholder: '',
+				min_length: 0,
+				label: 'Attachments',
+				type: 'textarea'
+			}, {
+				optional: true,
+				max_length: 150,
+				hint: '',
+				name: 'Username',
+				value: '',
+				placeholder: '',
+				min_length: 0,
+				label: 'Username',
+				type: 'text'
+			}]
+		}
+	}).catch((err) => {
+		console.log('<Error><Admin Menu><Config dialog.open>', err);
+	});
 }

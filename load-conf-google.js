@@ -50,8 +50,8 @@ exports.getConfig = (team_id, data) => {
 // Delete a config
 exports.deleteConfig = (team_id) => {
   return new Promise((resolve) => {
-  //  delete allConfigs[team_id].webClientUser;
-  //  delete allConfigs[team_id].webClientBot;
+    //  delete allConfigs[team_id].webClientUser;
+    //  delete allConfigs[team_id].webClientBot;
     resolve(delete allConfigs[team_id]);
   })
 }
@@ -124,4 +124,20 @@ const buildUserList = (team_id) => {
     }).catch((err) => {
       console.error('<Error><buildUserList><users.list>', err);
     });
+}
+
+exports.addTriggerToConfig = (team_id, data) => {
+  console.log('<add trigger> Adding a new trigger for team', team_id, 'with data:', data);
+  let newTrigger = {
+    item: 0,
+    type: data['Type'],
+    text: data['Text'],
+    username: data['Username'],
+    channel: 'current',
+    attachments: data['Attachments'],
+    delete_trigger: false
+  };
+  allConfigs[team_id].scripts[data['Trigger Name']] = [newTrigger];
+  allConfigs[team_id].keys.push(data['Trigger Name']);
+  console.log('keys are', allConfigs[team_id].keys);
 }

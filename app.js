@@ -14,6 +14,7 @@ console.log('<Loading> Config file is', config_file);
 require('dotenv').config({
 	path: `${config_file}`
 });
+// For some API calls when there isn't a token
 const axios = require('axios');
 // Fun with oAuth
 redis = require('./redis');
@@ -57,19 +58,23 @@ app.use('/slack/actions', slackInteractions.expressMiddleware());
 // Mount the event handler on a route
 app.use('/slack/events', slackEvents.expressMiddleware());
 
-// Attach listeners to events by Slack Event "type". See: https://api.slack.com/events/message.im
+// Listen for message events
 slackEvents.on('message', (event, body) => {
+	// Check for an auth in the DB
 	redis.get(body.team_id).then((auth) => {
+		// Make sure there's a valid auth
 		if (Object.keys(auth).length > 0) {
 			// Check if the event is a bot generated message - if so, don't respond to it to avoid loops
-			// NOTE: remove this safety valve of `&& !event.bot_id` if you want to have nested replies and use at your own risk!
-			if (event.type === 'message' && !event.subtype && !event.bot_id) {
+			// NOTE: remove this safety valve and add || (event.subtype === 'bot_message')) if you want to have nested replies and use at your own risk!
+			if ((event.type === 'message' && !event.subtype)) { //|| (event.subtype === 'bot_message')) {
+				// Retreive the config (or populate from the DB)
 				configTools.getConfig(auth.team_id, auth).then((config) => {
 					// Matched a trigger from a user so playback the story
+					// Do this to hanle slash commands allowing anything after the trigger text
 					let regexRes = event.text.match(/(\/.*(?=\s)) .*/);
 					let indexMatch = null;
-					// Do this to hanle slash commands allowing anything after the trigger text
 					if (regexRes) {
+						// Check for a full slash command trigger match, or if not just the command and exclude any args
 						indexMatch = indexOfIgnoreCase(config.keys, regexRes[0]);
 						if (indexMatch < 0) {
 							indexMatch = indexOfIgnoreCase(config.keys, regexRes[1]);
@@ -83,7 +88,12 @@ slackEvents.on('message', (event, body) => {
 				}).catch(console.error);
 			}
 		} else {
-			console.log('<AUTH> Request from workspace', body.team_id, 'does not have valid auth!');
+			// Getting a request from an installed app, but there's no info in the DB - prompt to reauth it
+			console.log('<AUTH> Request from workspace', team_id, 'does not have valid auth!');
+			storyBotTools.adminReauth(req.body.response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
+				client_id: process.env.SLACK_CLIENT_ID,
+				scope: process.env.SCOPE
+			}));
 		}
 	}).catch(console.error);
 });
@@ -112,7 +122,12 @@ slackEvents.on('reaction_added', (event, body) => {
 				}).catch(console.error);
 			}
 		} else {
-			console.log('<AUTH> Request from workspace', body.team_id, 'does not have valid auth!');
+			// Getting a request from an installed app, but there's no info in the DB - prompt to reauth it
+			console.log('<AUTH> Request from workspace', team_id, 'does not have valid auth!');
+			storyBotTools.adminReauth(req.body.response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
+				client_id: process.env.SLACK_CLIENT_ID,
+				scope: process.env.SCOPE
+			}));
 		}
 	}).catch(console.error);
 });
@@ -130,11 +145,6 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 				} else if (payload.callback_id === 'callback_admin_menu') {
 					storyBotTools.adminCallback(payload, respond, configTools);
 				} else if (payload.callback_id === 'callback_config') {
-					/*configTools.setConfig(auth, {
-						gsheetID: payload.submission['Google Sheet Link'],
-						clientEmail: payload.submission['Google API Email'],
-						privateKey: payload.submission['Google Private Key']
-					});*/
 					// Allow full URLs
 					let match = payload.submission['Google Sheet Link'].match(/(?<=https:\/\/docs\.google\.com\/spreadsheets\/d\/).*(?=\/)/);
 					if (match) {
@@ -148,6 +158,9 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 						}
 					})).catch(console.error);
 					configTools.getConfig(auth.team_id, auth);
+				} else if (payload.callback_id === 'callback_add_trigger') {
+					console.log('<addtrigger> ok lets append this trigger');
+					configTools.addTriggerToConfig(auth.team_id, payload.submission);
 				} else {
 					if (config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id)) {
 						storyBotTools.callbackMatch(payload, respond, config, config.scripts.Callbacks.find(o => o.callback_name == payload.callback_id));
@@ -157,7 +170,12 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 				}
 			}).catch(console.error);
 		} else {
-			console.log('<AUTH> Request from workspace', req.body.team_id, 'does not have valid auth!');
+			// Getting a request from an installed app, but there's no info in the DB - prompt to reauth it
+			console.log('<AUTH> Request from workspace', team_id, 'does not have valid auth!');
+			storyBotTools.adminReauth(req.body.response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
+				client_id: process.env.SLACK_CLIENT_ID,
+				scope: process.env.SCOPE
+			}));
 		}
 	}).catch(console.error);
 });
@@ -181,14 +199,19 @@ app.use(bodyParser.json());
 app.post('/slack/commands', function(req, res) {
 	// respond immediately!
 	res.status(200).end();
-	//	console.log('req is', req);
-	//	let command = req.body.command;
-	//	let args = req.body.text;
+
 	const {
 		command,
 		text,
-		team_id
+		team_id,
+		user_id,
+		channel_id,
+		headers,
+		trigger_id,
+		response_url
 	} = req.body;
+
+	// Secrets, secrets are no fun
 	const timeStamp = req.headers['x-slack-request-timestamp'];
 	const slashSig = req.headers['x-slack-signature'];
 	const reqBody = JSON.stringify(req.body);
@@ -197,33 +220,30 @@ app.post('/slack/commands', function(req, res) {
 	JSON.stringify(hmac.update(baseString));
 	const mySignature = `v0=${hmac.digest(`hex`)}`;
 
-	if (mySignature == slashSig) {
-		//	console.log(`Success
-		//     Signature: ${mySignature}`);
-	} else {
-		//	console.log(`SIGNATURES DO NOT MATCH
-		//   Expected: ${mySignature}
-		// Actual: ${slashSig}`);
-	}
-
 	// Check if the requesting team / user is already in the DB
-	redis.get(req.body.team_id).then((auth) => {
+	redis.get(team_id).then((auth) => {
 		if (Object.keys(auth).length > 0) {
 			// Check if there's already a configuration and if not, this will set it up. If there are config params in the DB load them as well
+			// Also many hidden commands
 			configTools.getConfig(auth.team_id, auth).then((config) => {
 				if (command === '/storybot' || command === '/devstorybot') {
 					if (text === 'dm') {
+						// Toggle for the admin menus to go to DM vs channel
 						config.dm = !config.dm;
 						redis.set(auth.team_id, Object.assign(auth, {
 							dm: config.dm
 						})).catch(console.error);
 					} else if (text === 'set') {
+						// Drop the history to let the played back actions to stay
 						config.message_history = [];
 					} else if (text === 'cleanup') {
+						// Delete all history
 						storyBotTools.deleteAllHistory(config);
 					} else if (text === 'reload') {
-						configTools.loadConfig(req.body.team_id).catch(console.error);
+						// Reload the current config
+						configTools.loadConfig(team_id).catch(console.error);
 					} else if (text === 'uninstall') {
+						// Uninstall the app - delete from the DB, revoke the token, and remove from running config
 						redis.del(auth.team_id).then((res) => {
 							config.webClientBot.auth.revoke({
 								token: auth.access_token,
@@ -232,8 +252,12 @@ app.post('/slack/commands', function(req, res) {
 							}).catch(console.error);
 						}).catch(console.error);
 					} else if (text === 'debug') {
+						// Put out the entire running config to console
 						console.log('allConfigs =', configTools.debugConfig());
+					} else if (text === 'trigger') {
+						storyBotTools.newTriggerDialog(config, trigger_id);
 					} else {
+						// Or, if no options, generate the admin menu
 						storyBotTools.adminMenu(req.body, config);
 					}
 				} else {
@@ -241,8 +265,8 @@ app.post('/slack/commands', function(req, res) {
 					let indexMatch = indexOfIgnoreCase(config.keys, command + ' ' + text);
 					if (indexMatch >= 0) {
 						let slash_event = {
-							user: req.body.user_id,
-							channel: req.body.channel_id,
+							user: user_id,
+							channel: channel_id,
 							text: command + ' ' + text,
 							ts: 'slash',
 						};
@@ -255,9 +279,11 @@ app.post('/slack/commands', function(req, res) {
 				}
 			}).catch(console.error);
 		} else {
-			console.log('<AUTH> Request from workspace', req.body.team_id, 'does not have valid auth!');
-			storyBotTools.adminReauth(req.body, "https://slack.com/oauth/authorize?" + qs.stringify({
-				client_id: process.env.SLACK_CLIENT_ID
+			// Getting a request from an installed app, but there's no info in the DB - prompt to reauth it
+			console.log('<AUTH> Request from workspace', team_id, 'does not have valid auth!');
+			storyBotTools.adminReauth(response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
+				client_id: process.env.SLACK_CLIENT_ID,
+				scope: process.env.SCOPE
 			}));
 		}
 	}).catch(console.error);
@@ -275,6 +301,7 @@ app.get('/install', (req, res) => {
 			client_secret: process.env.SLACK_CLIENT_SECRET,
 			code: req.query.code
 		}
+		// Exchange the code/token, set up the DB, load the config to running, and make sure the token works, then redirect back to workspace
 		axios.post('https://slack.com/api/oauth.access', qs.stringify(args)).then((accessRes) => {
 			redis.set(accessRes.data.team_id, accessRes.data).then((redisRes) => {
 				configTools.getConfig(redisRes.team_id, redisRes);
