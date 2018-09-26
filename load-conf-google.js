@@ -38,9 +38,9 @@ exports.getConfig = (team_id, data) => {
         // TODO - remove this once the DB is set up correctly again in all instances
         if (data.configParams.clientEmail || data.configParams.privateKey) {
           console.log('<DB DEBUG> Old Style configParams detected. Currently is:',data.configParams);
-          data.configParams.googleCreds.client_email = data.configParams.clientEmail;
+          data.configParams['googleCreds'].client_email = data.configParams.clientEmail;
           delete data.configParams.clientEmail;
-          data.configParams.googleCreds.private_key = data.configParams.privateKey;
+          data.configParams['googleCreds'].private_key = data.configParams.privateKey;
           delete data.configParams.privateKey;
           console.log('<DB DEBUG> Old Style configParams detected. After change it is:',data.configParams);
           redis = require('./redis');
