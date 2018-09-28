@@ -89,7 +89,7 @@ slackEvents.on('message', (event, body) => {
 			}
 		} else {
 			// Getting a request from an installed app, but there's no info in the DB - prompt to reauth it
-			console.log('<AUTH> Request from workspace', team_id, 'does not have valid auth!');
+			console.log('<AUTH> Request from workspace', body.team_id, 'does not have valid auth!');
 			storyBotTools.adminReauth(req.body.response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
 				client_id: process.env.SLACK_CLIENT_ID,
 				scope: process.env.SCOPE
@@ -123,7 +123,7 @@ slackEvents.on('reaction_added', (event, body) => {
 			}
 		} else {
 			// Getting a request from an installed app, but there's no info in the DB - prompt to reauth it
-			console.log('<AUTH> Request from workspace', team_id, 'does not have valid auth!');
+			console.log('<AUTH> Request from workspace', body.team_id, 'does not have valid auth!');
 			storyBotTools.adminReauth(req.body.response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
 				client_id: process.env.SLACK_CLIENT_ID,
 				scope: process.env.SCOPE
@@ -170,7 +170,7 @@ slackInteractions.action(/callback_/, (payload, respond) => {
 			}).catch(console.error);
 		} else {
 			// Getting a request from an installed app, but there's no info in the DB - prompt to reauth it
-			console.log('<AUTH> Request from workspace', team_id, 'does not have valid auth!');
+			console.log('<AUTH> Request from workspace', payload.team_id, 'does not have valid auth!');
 			storyBotTools.adminReauth(req.body.response_url, "https://slack.com/oauth/authorize?" + qs.stringify({
 				client_id: process.env.SLACK_CLIENT_ID,
 				scope: process.env.SCOPE
