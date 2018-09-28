@@ -20,8 +20,8 @@ exports.getConfig = (team_id, data) => {
       allConfigs[team_id] = {};
       allConfigs[team_id].message_history = [];
       allConfigs[team_id].keys = [];
-      allConfigs[team_id].configParams = {};
       allConfigs[team_id].dm = false;
+      allConfigs[team_id].configParams = {};
     }
     // If there are config params already stored, load them
     if (data) {
@@ -32,16 +32,31 @@ exports.getConfig = (team_id, data) => {
       if (!allConfigs[team_id].webClientBot) {
         allConfigs[team_id].webClientBot = new WebClient(data.bot.bot_access_token);
       }
-
+      if (data.dm) {
+        allConfigs[team_id].dm = data.dm;
+      }
       if (data.configParams) {
-        if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.clientEmail === allConfigs[team_id].configParams.clientEmail && data.configParams.privateKey === allConfigs[team_id].configParams.privateKey)) {
+        // Added a switch to see if there was an old-style config in the DB and hack it into place
+        // TODO - remove this once the DB is set up correctly again in all instances
+        if (data.configParams.clientEmail || data.configParams.privateKey) {
+          console.log('<DB DEBUG> Old Style configParams detected. Currently is:', data.configParams);
+          data.configParams.googleCreds = {};
+          data.configParams.googleCreds.client_email = data.configParams.clientEmail;
+          delete data.configParams.clientEmail;
+          data.configParams.googleCreds.private_key = data.configParams.privateKey;
+          delete data.configParams.privateKey;
+          console.log('<DB DEBUG> Old Style configParams detected. After change it is:', data.configParams);
+          redis = require('./redis');
+          redis.set(team_id, data).catch(console.error);
+          allConfigs[team_id].configParams = data.configParams;
+          resolve(exports.loadConfig(team_id));
+        } //end section to remove once all converted
+        if (!(data.configParams.gsheetID === allConfigs[team_id].configParams.gsheetID && data.configParams.googleCreds.client_email === allConfigs[team_id].configParams.googleCreds.client_email && data.configParams.googleCreds.private_key === allConfigs[team_id].configParams.googleCreds.private_key)) {
           allConfigs[team_id].configParams = data.configParams;
           resolve(exports.loadConfig(team_id));
         }
       }
-      if (data.dm) {
-        allConfigs[team_id].dm = data.dm;
-      }
+
     }
     resolve(allConfigs[team_id]);
   })
@@ -68,8 +83,8 @@ exports.loadConfig = (team_id) => {
       spreadsheetKey: allConfigs[team_id].configParams.gsheetID, // || process.env.GSHEET_ID,
       // your google oauth2 credentials 
       credentials: {
-        client_email: allConfigs[team_id].configParams.clientEmail, // || process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: allConfigs[team_id].configParams.privateKey, // || process.env.GOOGLE_PRIVATE_KEY
+        client_email: allConfigs[team_id].configParams.googleCreds.client_email, // || process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: allConfigs[team_id].configParams.googleCreds.private_key, // || process.env.GOOGLE_PRIVATE_KEY
       },
       // names of the sheet you want to extract (or [] for all) 
       sheetsToExtract: []

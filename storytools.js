@@ -117,6 +117,10 @@ exports.playbackScript = (config, term, event) => {
 									attachments: action.attachments
 								}
 
+								if (action.type === 'reply') {
+									params.channel = target_channel;
+								}
+
 								//look up the user's token to post on their behalf or see if we can post as a prototype using the bot
 								let tokenMatch = tokens.find(o => o.name === action.username);
 								if (tokenMatch) {
@@ -876,12 +880,10 @@ exports.adminCallback = (payload, respond, configTools) => {
 				{
 					// TODO janky, fix eventually
 					let gsheetID = '',
-						clientEmail = '',
-						privateKey = '';
+						googleCreds = '';
 					if (config.configParams) {
 						gsheetID = config.configParams.gsheetID;
-						clientEmail = config.configParams.clientEmail;
-						privateKey = config.configParams.privateKey;
+						googleCreds = JSON.stringify(config.configParams.googleCreds);
 					}
 
 					const configDialog = {
@@ -900,23 +902,13 @@ exports.adminCallback = (payload, respond, configTools) => {
 							type: 'text'
 						}, {
 							optional: false,
-							max_length: 150,
-							hint: 'Email address that the sheet is shared with',
-							name: 'Google API Email',
-							value: clientEmail,
+							max_length: 3000,
+							hint: 'Google API Credentials',
+							name: 'Google API Credentials',
+							value: googleCreds,
 							placeholder: '',
 							min_length: 0,
-							label: 'Google API Email',
-							type: 'text'
-						}, {
-							optional: false,
-							max_length: 2000,
-							hint: 'Private key',
-							name: 'Google Private Key',
-							value: privateKey,
-							placeholder: '',
-							min_length: 0,
-							label: 'Google Private Key',
+							label: 'Google API Credentials',
 							type: 'textarea'
 						}]
 					};
