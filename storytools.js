@@ -853,15 +853,13 @@ exports.adminCallback = (payload, respond, configTools) => {
 			case 'Reload Config':
 				{
 					// calling this with nulls to use existing sheet values
-					configTools.loadConfig(payload.team.id).catch(console.error);
-
-					respond({
-						text: "OK! I'm re-loading!",
+					configTools.loadConfig(payload.team.id).then(respond({
+						text: "Config re-loaded",
 						response_type: 'ephemeral',
 						replace_original: true
 					}).catch((err) => {
 						console.error('<Error><Admin Menu><Reload Config>', err);
-					});
+					})).catch(console.error);
 					break;
 				}
 			case 'Cleanup All':
